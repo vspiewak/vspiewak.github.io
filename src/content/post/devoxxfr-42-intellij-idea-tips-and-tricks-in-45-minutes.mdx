@@ -1,0 +1,167 @@
+---
+publishDate: 2014-04-24T00:00:00Z
+title: '[DevoxxFR] 42 IntelliJ IDEA tips and tricks in 45 minutes'
+excerpt: Hadi Hariri (@hhariri) nous a présenté 42 tips et tricks sous IntelliJ IDEA 13. C’était l’occasion parfaite pour réviser tous ses raccourcis clavier.
+image: '~/assets/images/post/devoxxfr-42-intellij-idea-tips-and-tricks-in-45-minutes/cover.png'
+category: Tutorial
+tags:
+  - intellij
+  - java
+metadata:
+  canonical: https://vspiewak.com/devoxxfr-42-intellij-idea-tips-and-tricks-in-45-minutes
+---
+
+## Pitch
+
+There are so many features in IntelliJ IDEA, but we’re going to concentrate on just 42, and we’re going to try and show them in 45 minutes. That’s around 1 tip per minute because we need to leave 3 minutes for Hello, Welcome and Thank you.
+
+If a single one goes bad, we have less than a minute per tip. But here’s hoping it won’t.
+
+
+### Préambule
+
+Tout d’abord, afin de vous y retrouver dans l’article, sachez que :
+
+```bash
+⌘ : command (a.k.a pomme)
+
+⌥ : option (a.k.a alt)
+
+⇧ : shift
+
+⏎ : Return (a.k.a enter)
+
+^ : ctrl
+```
+
+
+Ce billet utilise le mapping "Mac OS", utilisé par défaut. Quelque soit votre OS, Hadi nous a précisé de ne pas utiliser de mapping "Eclipse", qui ne binde pas toutes les features.
+
+### Raccourcis claviers
+
+
+```bash
+⌘ + N : permet de rechercher une classe
+
+⌘ + N puis "AU" : permet de trouver la classe AjaxUtils
+
+⌘ + N puis "AU:40" : permet d’aller directement à la ligne 40 de la classe AjaxUtils
+
+⌘ + ⇧ + N : permet de rechercher n’importe quel fichier
+
+⌘ + ⇧ + N puis "/conf" : permet de chercher un répertoire
+
+⌘ + 1 : met le focus sur l’arboresence (fenêtre file structure) lorsque vous aviez le focus sur la fenêtre d’édition
+
+⌘ + 1 puis "pom" : permet de rechercher les fichiers commençant par "pom" dans l’arborescence
+
+⌘ + ⇧ + ⌥ + N : permet de rechercher un symbole (une méthode, une variable, une classe CSS, etc…)
+
+⌘ + ⇧ + S : recherche structurelle (permet de rechercher les try avec catch vides, etc…)
+
+⇧ + ⇧ : feature "search everywhere"
+
+⌘ + ⇧ + A : permet de rechercher une action
+
+⌘ + (Fn) + F12 : ouvre un inspecteur affichant l’ensemble des méthodes
+
+Fn + ⌥ + ← : met le focus sur le "fil d’ariane" (utilisez les flèches ← ↓ ↑ → naviguer ensuite)
+
+⌘ + E : affiche dans une fenêtre les fichiers récents
+
+⌘ + ⇧ + E : affiche dans une fenêtre les fichiers récemment édités
+
+⌘ + ⇧ + I : affiche dans une fenêtre les infos de la classe sélectionnée (ou simplement où est le curseur)
+
+⌘ + ⌥ + B : navigue à l’implémentation
+
+⌥ + F7 : affiche les usages de la méthode (find usage)
+
+⌘ + ⇧ + F12 : active / désactive le mode plein écran (cache toutes les fenêtres sur les cotés ainsi qu’en bas)
+
+⌘ + ⇧ + P : active / désactive le mode présentation (les fontes sont plus grosses) (* A binder)
+
+⇧ + F4 : détache la fenêtre courante
+
+⌘ + ⇧ + ← (ou →) : permet de faire slider incrémentalement une fenêtre (tel que la barre de navigation) dans une direction
+
+⌘ + W : permet de sélectionner de façon incrémentale
+
+⌘ + ⇧ + W : permet de réduire la sélection de façon incrémentale
+
+⌘ + ⇧ + ↑ : permet de faire monter le bloc de code sélectionné
+
+⌘ + ⇧ + ↓ : permet de faire descendre le bloc de code sélectionné
+
+⌘ + ⇧ + ⏎ : permet de compléter le "statement" (tapez juste if, cela ajoute les parenthèses ainsi que les accolades)
+
+⌘ + ⇧ + V : affiche une fenêtre avec l’historique de tout ce qui à été copié (clipboard history)
+
+⌥ + ⇧ + click : permet de faire une sélection multi-caret (comme sous sublime text)
+
+⌥ + ⏎ : smart completion (exemple: "introduce local variable", etc…)
+
+^ + ⇧ + SPACE : permet la complétion intelligente
+
+F2 : prochaine erreur soulignée
+
+⇧ + F2 : précédente erreur soulignée
+
+^ + ` :  Quick switch scheme (keymap par exemple, utile en pair-programming, mais je n’ai pas réussi à le reproduire :s)
+
+⌘ + ⌥ + L : Reformate le code
+
+⌘ + ⌥ + O : Organise les imports
+```
+
+
+### Templates
+
+
+Preferences > Code Style : permet de personnaliser entièrement la façon dont IntelliJ reformatera le code automatiquement
+
+Preferences > File and Code templates : permet de personnaliser les templates de fichiers (vous pouvez créer un template HTML5 + Bootstrap facilement par exemple)
+
+Preferences > Live templates : permet de personnaliser les live templates (exemple: psvm + Tab vous permet de générer une méthode public static void main(…) dans votre classe Java)
+
+### Edition HTML
+
+
+Utilisez la puissance et la vitesse de [Emmet.io](https://web.archive.org/web/20141221193347/http://emmet.io/) lorsque vous écrivez du HTML.
+
+Tapez : div.feature>h4+p puis TAB et obtenez :
+
+```html
+<div class="feature">
+    <h4></h4>
+    <p></p>
+</div>
+```
+
+
+### Tricks
+
+
+N’utilisez plus votre souris si vous voulez être productif (une fois la courbe d’apprentissage passée ^^)
+
+Utilisez "Idea Vim Plugin" si vous êtes accro à vim
+
+Utilisez la feature "Quick list" pour créer ses propres menus contextuels d’actions, puis affectez à la liste un raccourci clavier (cf. [http://www.jetbrains.com/idea/webhelp/configuring-quick-lists.html](https://web.archive.org/web/20141221193347/http://www.jetbrains.com/idea/webhelp/configuring-quick-lists.html))
+
+Utilisez le "Productivity Guide" pour avoir les statistiques complètes de votre utilisation des features IntelliJ (cf. [https://www.jetbrains.com/idea/webhelp/productivity-guide.html](https://web.archive.org/web/20141221193347/https://www.jetbrains.com/idea/webhelp/productivity-guide.html))
+
+Editez le fichier "*/Applications/IntelliJ IDEA* 13.app/Contents/Info.plist" et la clé "JVMVersion" pour utiliser une JVM 1.7 (ou 1.8)
+
+File > Power save mode permet d’activer ou désactiver le "Power save mode" et ainsi économiser de la batterie
+
+(pour info: [http://stackoverflow.com/questions/11725605/what-is-power-save-mode-in-intellij-idea-and-other-jetbrains-ides](https://web.archive.org/web/20141221193347/http://stackoverflow.com/questions/11725605/what-is-power-save-mode-in-intellij-idea-and-other-jetbrains-ides))
+
+## Conclusion
+
+
+Cette session en anglais était très instructive. Le speaker s’était donné comme objectif de nous apprendre chacun au moins 3 trucs utiles. Challenge rempli pour ma part. Et vous ?
+
+## Ressources
+
+- [http://cfp.devoxx.fr/devoxxfr2014/talk/TYC-384/42 IntelliJ IDEA tips and tricks in 45 minutes](https://web.archive.org/web/20141221193347/http://cfp.devoxx.fr/devoxxfr2014/talk/TYC-384/42%20IntelliJ%20IDEA%20tips%20and%20tricks%20in%2045%20minutes)
+- [http://cfp.devoxx.fr/devoxxfr2014/speaker/Hadi Hariri](https://web.archive.org/web/20141221193347/http://cfp.devoxx.fr/devoxxfr2014/speaker/f055fdd01608ab8b60dec468b7bddd0eae21eb3b/Hadi%20Hariri)

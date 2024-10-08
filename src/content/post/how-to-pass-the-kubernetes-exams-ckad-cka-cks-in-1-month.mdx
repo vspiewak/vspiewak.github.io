@@ -1,0 +1,151 @@
+---
+publishDate: 2024-03-15T00:00:00Z
+title: 'How to pass the CKAD, CKA & CKS exams'
+excerpt: I just completed the CKAD, CKA & CKS exams in a month. Here is my tips & tricks to do the same 😌
+image: '~/assets/images/post/how-to-pass-the-kubernetes-exams-ckad-cka-cks-in-1-month/cover.png'
+category: Tutorial
+tags:
+  - kubernetes
+  - certification
+  - ckad
+  - cka
+  - cks
+metadata:
+  canonical: https://vspiewak.com/how-to-pass-the-kubernetes-exams-ckad-cka-cks-in-1-month
+---
+
+I successfully completed the Kubernetes exams in a bit more than a month 🥳
+
+Here is the official badges issued by [The Linux Foundation](https://www.credly.com/organizations/the-linux-foundation/badges) on Credly :
+* [CKAD - Certified Kubernetes Application Developer](https://www.credly.com/badges/f991d9ce-d925-45d4-a592-bf8f7c8ebd92) on Febuary 08 
+* [CKA - Certified Kubernetes Administrator](https://www.credly.com/badges/6872ba19-6ee8-4a9b-8121-ae12fb492729) on Febuary 21
+* [CKS - Certified Kubernetes Security Specialist](https://www.credly.com/earner/earned/badge/77c4829d-0372-4ff4-96e4-e3d091761057) on March 14
+
+### Learning Path
+
+The CKAD, CKA & CKS are 2 hours hands on exams in a PSI Secure Browser. 
+You have one year to pass the exam after the purchase.
+You can find easily a [coupon code](https://www.google.com/search?q=ckad+coupon+code) on the internet for some discount.
+
+
+### Courses
+
+Here is the courses I recommend for the exams :
+* CKAD : [Certified Kubernetes Application Developer CKAD](https://www.sandervanvugt.com/course/certified-kubernetes-application-developer-ckad-video-course/) by [Sander van Vugt](https://www.linkedin.com/in/sandervanvugt)
+Let's be honest here. At first I was wondering who is Sander ? Why he didn't yet introduced ConfigMaps & Secrets ?
+But at the end of his course, you have learned everthing needed for CKAD, without all the unecessary, and with demos showing you all the shortcuts & easy ways to solve questions using `kubectl run, create, edit, scale` etc...
+By the way, Sander started technical trainings before I even graduated high school 🫡
+* CKA : [The Ultimate Kubernetes Administrator Course](https://www.techworld-with-nana.com/kubernetes-administrator-cka) by [Nana Janashia](https://www.linkedin.com/in/nana-janashia)
+Nana made a really pleasant to watch course about CKA, and like Sander, it shows you only the necessary, without any "fat". 
+* CKS : [Kubernetes CKS Full Course Theory + Practice + Browser Scenarios](https://www.youtube.com/watch?v=d9xfB5qaOfg) by [Kim Wüstkamp](https://www.linkedin.com/in/kimwuestkamp) 
+Kim who made [Killer.sh](https://killer.sh), also provide a **free** CKS course on Youtube! I'm not event sure there is an alternative course for CKS 🤔.
+
+### Killer.sh > 75
+
+You will have 2 free sessions on killer.sh, which is quite similar to the PSI Secure Browser. 
+Each one available for 36 hours, but both have the same questions.
+If you succeed to a score of 75 or more, you should be fine at the exam.
+
+![PSI-like exam UI](~/assets/images/post/how-to-pass-the-kubernetes-exams-ckad-cka-cks-in-1-month/psi-like-exam.png)
+
+
+### Know how to verify
+
+Be able to verify by yourself your answer is a really good exercise during the training phase.
+For instance, if they ask you to deny all traffic from a pod,
+you can check it using :
+```bash
+kubectl -n sandbox exec shell -- curl -s google.com
+```
+
+### kubectl explain
+
+At the exam, you will have access to the [kubernetes official documentation](https://kubernetes.io/docs), but if you need to search in it for every questions, you will lose too much time... So being familiar with the doc to [quickly find a yaml sample](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/) for a `PersistentVolume` is nice, but for the rest, `kubectl explain` is your best tool !
+
+```bash
+# Get the documentation of the resource and its fields
+kubectl explain pods
+
+# Get the documentation of a specific field of a resource
+kubectl explain pods.spec.containers
+
+# Get all the fields in the resource
+kubectl explain pods --recursive
+
+# Browse the documentation
+kubectl explain pods --recursive | less
+```
+
+### kubectl run, create, edit, scale, expose
+
+You can solve most of the questions without writing any yaml, if you know the tricks ;)
+Worst scenario would be to type a command, dump the yaml into a file, then edit & apply.
+Here is some samples:
+
+```bash
+# Create a nignx pod ...
+kubectl run nginx --image=nginx 
+
+# ... and dump it to a yaml file for some customization
+kubectl run nginx --image=nginx  --dry-run=client -o yaml > pod.yaml
+
+# Create a deployment
+kubectl create deployment nginx --image=nginx 
+
+# Scale it to 3 pods 
+kubectl scale --replicas=3 deployment/nginx
+
+# Expose deployment
+kubectl expose deployment nginx --port=80 --target-port=8000
+
+# Change ClusterIp to NodePort with edit
+kubectl edit svc nginx
+```
+
+### Set context & namespace
+
+Each question is bound to a particular context & namespace.
+Use `kubectl config set-context ...` at the *beginning of each question* to be sure where you are.
+They will provide the command, you just have to copy-paste it !
+
+
+### Flag & Skip
+
+You must have 66% or above to obtain the certification. So it's better to flag & skip a question, instead of losing 15 minutes on it ! You can go back on it later ;) 
+If you 
+
+### Backup files
+
+You should backup any file they provide, in case you want to restore it, like any seasoned Ops 👴🏼
+
+```bash
+cp /some-dir/file.yaml /some-dir/file.yaml.ori
+```
+
+### Minikube or some VMs in the cloud
+
+For CKAD, [Minikube](https://minikube.sigs.k8s.io) is your perfect training environment.
+On the other hand, I strongly recommand you to use some VMs on AWS, GCP or Azure for the CKA & CKS.
+Some people could argue that you can do it using Vagrant or Minikube, 
+but it will add an unecessary level of abstraction...
+
+Killer-sh provide a good [k8s cluster setup example](https://github.com/killer-sh/cks-course-environment).
+
+
+### Vim tips
+
+Vim will be your only editor available. So be comfortable to use it.
+There is a lot of [Vim beginners guide](https://www.freecodecamp.org/news/vim-beginners-guide) on the internet if you need to.
+
+One particular useful Vim trick for the exam is to visual select a yaml block and indent it.
+You can easily do it with : 
+* `shift + V` to select some lines
+* `>` or `<` to indent them more or less
+* `.` to repeat
+
+
+
+### TL;DR
+
+The kubernetes certifications doesn't contain any big surprises if you have studied & trained enough.
+Don't stress to much, and keep in mind you need to achieve 66% with one free retake 😉

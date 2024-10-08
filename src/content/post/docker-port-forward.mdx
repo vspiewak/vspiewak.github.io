@@ -1,0 +1,33 @@
+---
+publishDate: 2019-02-04T00:00:00Z
+title: 'Docker port-forward'
+excerpt: kubectl port-forward command is quite useful. I just made the same for docker 🫡
+image: '~/assets/images/post/docker-port-forward/cover.png'
+category: Project
+tags:
+  - docker
+  - bash
+  - tools
+metadata:
+  canonical: https://vspiewak.com/docker-port-forward
+---
+
+Ever felt jealous of Kubernetes `kubectl port-forward` command while you're wrestling with Docker ?
+
+I just crafted a tiny shell script that lets you forward local ports to your Docker containers faster than you can say "Why isn't this already a Docker feature?"
+
+Let's be honest, it was just a pretext to craft a one-liner install script in Bash 😏
+
+You can give it a try :
+```bash 
+# install
+curl -o- https://raw.githubusercontent.com/vspiewak/dpf/master/install.sh | bash
+
+# then
+dpf <container-name> <local-port> <container-port>
+
+# or simpler
+dpf <container-name> <port>
+```
+
+You can review this project on [Github](https://github.com/vspiewak/dpf)
