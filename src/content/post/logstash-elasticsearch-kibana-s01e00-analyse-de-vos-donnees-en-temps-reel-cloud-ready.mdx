@@ -1,0 +1,52 @@
+---
+publishDate: 2013-12-05T00:00:00Z
+title: 'Logstash, ElasticSearch, Kibana – S01E00 – Analyse de vos données en temps réel cloud-ready'
+excerpt: Dans ce billet de blog, nous allons découvrir un ensemble de produits OpenSource permettant de centraliser et d’analyser les données de votre SI en temps réel.
+image: '~/assets/images/post/logstash-elasticsearch-kibana-s01e00-analyse-de-vos-donnees-en-temps-reel-cloud-ready/cover.png'
+category: Tutorial
+tags:
+  - elasticsearch
+  - logstash
+  - kibana
+metadata:
+  canonical: https://vspiewak.com/logstash-elasticsearch-kibana-s01e00-analyse-de-vos-donnees-en-temps-reel-cloud-ready
+---
+
+Dans ce billet de blog, nous allons découvrir un ensemble de produits OpenSource permettant de centraliser et d’analyser les données de votre SI en temps réel.
+
+Vous pourrez informer en direct vos différentes équipes via l’utilisation de dashboards personnalisés dans les bureaux et open spaces.
+
+
+- l’équipe de production peut visualiser la santé de son infrastructure
+- l’équipe de développement peut analyser les erreurs de ses applications
+- l’équipe marketing peut analyzer les besoins de ses clients
+- la direction peut visualiser les performances de l’entreprise et la part d’objectifs réalisés.
+
+Les solutions proposées dans cet article s’articulent autour des produits Logstash, ElasticSearch et Kibana.
+
+L’utilisation de Logstash ou des rivers Elasticsearch permet de se brancher sur tout type de source de données (fichiers, syslog, tcp, amqp, redis, twitter, etc…)
+
+L’association de ces 3 produits devient de plus en plus populaire, et offre notamment les propriétés suivantes:
+
+
+- recherche full text
+- indexation des données en temps réel
+- analyse des données en temps réel
+- architecture distribuée (scalabilité horizontale)
+- haute disponibilité
+
+(*source* [http://www.elasticsearch.org/overview/](http://www.elasticsearch.org/overview/))
+
+#### Cas 1 – Analyse de votre E-réputation sur le réseau social Twitter
+
+
+![image](~/assets/images/post/logstash-elasticsearch-kibana-s01e00-analyse-de-vos-donnees-en-temps-reel-cloud-ready/banner1.png)
+
+Dans cette première partie, nous verrons comment indexer l’[API de Streaming](https://dev.twitter.com/pages/streaming_api) publique de Twitter via une river ElasticSearch, puis comment créer un dashboard Kibana pas à pas afin de visualiser nos tweets.
+
+#### Cas 2 – Analyse orientée business de vos logs applicatifs
+
+
+![image](~/assets/images/post/logstash-elasticsearch-kibana-s01e00-analyse-de-vos-donnees-en-temps-reel-cloud-ready/banner2.png)
+
+La semaine prochaine, dans un deuxième article, nous verrons comment mettre à profit nos logs applicatifs afin de faire de l’analyse orientée "business" grâce à Logstash, ElasticSearch et Kibana.

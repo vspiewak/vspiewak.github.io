@@ -1,0 +1,342 @@
+---
+publishDate: 2013-12-06T00:00:00Z
+title: 'Logstash, ElasticSearch, Kibana – S01E01 – Analyse d’e-réputation sur Twitter'
+excerpt: Dans cet premier opus d’une mini série, nous allons voir comment monter un monitoring de Twitter afin d’aider notre équipe marketing.
+image: '~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/cover.png'
+category: Tutorial
+tags:
+  - elasticsearch
+  - logstash
+  - kibana
+metadata:
+  canonical: https://vspiewak.com/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter
+---
+
+Il arrive souvent que l’équipe marketing ou les community managers passent une partie de leur temps à scruter les différents réseaux sociaux en vogue (Facebook, Twitter, Google+, blogs, forums, etc.) pour prendre la tendance sur l’e-réputation de leur entreprise et de ses produits. Le tryptique Logstash, ElasticSearch, Kibana est une solution intéressante pour automatiser la collecte d’information et construire des tableaux de bords, avec des indicateurs agrégés et clairs.
+
+Dans cet premier opus d’une mini série, nous allons voir comment monter un monitoring de Twitter afin d’aider notre équipe marketing. Ce "classique" dans la communauté ElasticSearch (JUG, talks, …) permettra de nous focaliser sur la configuration d’un dashboard Kibana.
+
+![Bannière](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image1.png)
+
+À la fin de cet article, nous pourrons notamment répondre à des questions comme :
+
+- combien de fois ai-je été cité dans un tweet durant les 15 dernières minutes ?
+- quelle est ma part de marché parmi mes concurrents ?
+- quels sont les hashtags les plus populaires associés à ma marque ?
+- quelle est la répartition géographique des gens qui parlent de mes produits ?
+
+Suivez le guide.
+
+Dans un cas réel, une entreprise choisira certainement de cibler des termes comme :
+
+- son nom
+- le nom de ses produits
+- le nom du concurrent
+- le nom des produits concurrents
+
+Pour les besoins de l’exercice, nous nous concentrerons sur les termes ***iphone***, ***android***, et ***blackberry***. Ces 3 termes permettent de remonter un nombre de résultats suffisamment conséquent pour tester notre solution.
+
+### Création d’une application Twitter
+
+Avant de pouvoir indexer le contenu de Twitter, il faut se brancher sur son [API de Streaming](https://dev.twitter.com/pages/streaming_api) public. Pour cela, vous devez créer une application Twitter. C’est une procédure très simple ne prenant pas plus de 5 minutes.
+
+À l’aide de votre compte Twitter habituel :
+
+- Rendez-vous sur la page de vos applications à cette adresse : [https://dev.twitter.com/apps](https://dev.twitter.com/apps/)
+- Créez une nouvelle application (ici "Twitter Survey")
+- Remplissez tous les champs du formulaire excepté "*Callback URL*"
+- Acceptez les conditions (sans les lire ;)
+- Validez
+- Cliquez tout en bas de la page de votre application sur le bouton "*Create my access token*"
+
+![Portail Developpeur Twitter](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image2.png)
+
+Notez les valeurs "*Consumer key*", "*Consumer secret*", "*Access token*" et "*Access token secret*" vous donnant accès à la précieuse API.
+
+### Installation d’ElasticSearch
+
+Dans le terminal de votre Unix préféré, installons :
+
+- [Elasticsearch](http://www.elasticsearch.org/overview/)
+- le plugin [elasticsearch-head](https://github.com/mobz/elasticsearch-head) afin de visualiser notre cluster
+- le plugin [Twitter River](https://github.com/elasticsearch/elasticsearch-river-twitter/blob/master/README.md)
+
+```bash
+curl -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-0.90.3.zip
+unzip elasticsearch-0.90.3.zip
+cd elasticsearch-0.90.3/
+
+bin/plugin --install mobz/elasticsearch-head
+
+bin/plugin -install elasticsearch/elasticsearch-river-twitter/1.4.0
+```
+
+Démarrez ElasticSearch :
+
+```bash
+./bin/elasticsearch -f
+[2013-10-01 21:21:38,447][INFO ][node                     ] [Forearm] version[0.90.3], pid[18147], build[5c38d60/2013-08-06T13:18:31Z]
+[2013-10-01 21:21:38,447][INFO ][node                     ] [Forearm] initializing ...
+[2013-10-01 21:21:38,458][INFO ][plugins                  ] [Forearm] loaded [river-twitter], sites [bigdesk, head]
+[2013-10-01 21:21:40,322][INFO ][node                     ] [Forearm] initialized
+[2013-10-01 21:21:40,322][INFO ][node                     ] [Forearm] starting ...
+[2013-10-01 21:21:40,410][INFO ][transport                ] [Forearm] bound_address {inet[/0:0:0:0:0:0:0:0:9300]}, publish_address {inet[/192.168.1.5:9300]}
+[2013-10-01 21:21:43,435][INFO ][cluster.service          ] [Forearm] new_master [Forearm][qEpnBLA_RuGq1JcOSzsGVQ][inet[/192.168.1.5:9300]], reason: zen-disco-join (elected_as_master)
+[2013-10-01 21:21:43,455][INFO ][discovery                ] [Forearm] elasticsearch/qEpnBLA_RuGq1JcOSzsGVQ
+[2013-10-01 21:21:43,465][INFO ][http                     ] [Forearm] bound_address {inet[/0:0:0:0:0:0:0:0:9200]}, publish_address {inet[/192.168.1.5:9200]}
+[2013-10-01 21:21:43,465][INFO ][node                     ] [Forearm] started
+[2013-10-01 21:21:43,475][INFO ][gateway                  ] [Forearm] recovered [0] indices into cluster_state
+```
+
+### Création de la River Twitter
+
+Une [river](http://www.elasticsearch.org/guide/en/elasticsearch/rivers/current/river.html) est un service tournant au sein du cluster Elasticsearch, permettant de tirer ("pull") ou de recevoir ("pushed with data") des données.
+
+Il existe plusieurs types de river, notamment :
+
+- [CouchDB River](https://github.com/elasticsearch/elasticsearch-river-couchdb)
+- [RabbitMQ River](https://github.com/elasticsearch/elasticsearch-river-rabbitmq)
+- [Wikipedia River](https://github.com/elasticsearch/elasticsearch-river-wikipedia)
+- [Twitter River](https://github.com/elasticsearch/elasticsearch-river-twitter)
+
+Dans un autre terminal nous allons créer une river Elasticsearch de type "twitter" portant le nom "mobiles". Cette river indexera tous les tweets publics contenant les termes "iphone", "android", "blackberry". Les tweets seront insérés par lots de 500 et stockés dans l’index "mobiles".
+
+**Note :** N’oubliez pas de remplacer les étoiles par les valeurs correspondantes de votre application Twitter ^_^
+
+```bash
+curl -XPUT localhost:9200/_river/mobiles/_meta -d '
+{
+    "type" : "twitter",
+    "twitter" : {
+        "oauth" : {
+            "consumer_key" : "*********************",
+            "consumer_secret" : "******************************************",
+            "access_token" : "**************************************************",
+            "access_token_secret" : "*******************************************"
+        },
+        "filter" : {
+            "tracks" : "iphone,android,blackberry"
+        } 
+    },
+    "index" : {
+        "index" : "mobiles",
+        "type" : "tweet",
+        "bulk_size" : 500
+    }
+}
+'
+```
+
+La sortie d’ElasticSearch devrait être similaire à celle-ci :
+
+```bash
+[2013-10-01 21:22:01,104][INFO ][cluster.metadata           ] [Forearm] [_river] creating index, cause [auto(index api)], shards [1]/[1], mappings []
+[2013-10-01 21:22:01,369][INFO ][cluster.metadata           ] [Forearm] [_river] update_mapping [mobiles] (dynamic)
+[2013-10-01 21:22:01,387][INFO ][river.twitter              ] [Forearm] [twitter][mobiles] creating twitter stream river
+[2013-10-01 21:22:01,472][INFO ][cluster.metadata           ] [Forearm] [mobiles] creating index, cause [api], shards [5]/[1], mappings [tweet]
+[2013-10-01 21:22:01,534][INFO ][river.twitter              ] [Forearm] [twitter][mobiles] starting filter twitter stream
+[2013-10-01 21:22:01,536][INFO ][twitter4j.TwitterStreamImpl] Establishing connection.
+[2013-10-01 21:22:01,622][INFO ][cluster.metadata           ] [Forearm] [_river] update_mapping [mobiles] (dynamic)
+[2013-10-01 21:22:09,980][INFO ][twitter4j.TwitterStreamImpl] Connection established.
+[2013-10-01 21:22:09,980][INFO ][twitter4j.TwitterStreamImpl] Receiving status stream.
+```
+
+Vous pouvez visualiser l’état de santé de votre cluster Elasticsearch grâce au plugin head à l’adresse [http://localhost:9200/_plugin/head](http://localhost:9200/_plugin/head/)
+
+![Dashboard Kibana - Défaut](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image3.png)
+
+### Installation de Kibana
+
+Pour installer Kibana, il vous faut également un serveur web. L’exemple est donné pour une installation standard d’Apache, mais tout autre serveur web capable de servir des fichiers statiques fera l’affaire. Il faut que vous adaptiez à votre contexte.
+
+```bash
+curl -O https://download.elasticsearch.org/kibana/kibana/kibana-3.0.0milestone4.zip
+unzip kibana-3.0.0milestone4.zip
+sudo mv kibana-3.0.0milestone4 /var/www/kibana
+```
+
+Vous pouvez désormais accéder à Kibana à l’adresse : [http://localhost/kibana](http://localhost/kibana)
+
+![Image.png](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image4.png)
+
+La page d’accueil de Kibana dispose d’un menu en haut à droite permettant de charger, sauvegarder et partager vos dashboard via :
+
+- Fichier JSON
+- ElasticSearch
+- Gist
+- Permalien
+
+Kibana offre 4 dashboards par défaut :
+
+- un dashboard générique Logstash
+- un dashboard générique Elasticsearch
+- un dashboard non configuré
+- un dashboard vide
+
+Un dashboard se "branche" sur tous les index de votre cluster Elasticsearch, un index, ou les index dont le nom match un pattern (cas de logstash notamment).
+
+L’interface HTML5 basé sur Twitter Bootstrap se décompose en lignes de 12 colonnes (pliables ou non) contenant des panels.
+
+Il existe plusieurs types de panels à ajouter et configurer (recherche, période de temps, histogramme, camembert, carte, Markdown, …)
+
+### Création d’un dashboard Kibana
+
+Nous allons créer un dashboard pas à pas, personnalisé pour nos données. N’oubliez pas de sauvegarder votre dashboard avant de rafraichir la page de votre navigateur !
+
+#### Etape 1 – Configuration et ligne de recherche
+
+Partez d’un Dashboard vierge en cliquant sur le lien "*Blank Dashboard*".
+
+![Dashboard Kibana - Blank](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image5.png)
+
+Nous allons connecter Kibana à l’index "mobiles" de notre Elasticsearch.
+
+Ouvrez la fenêtre modale "*Dashboard settings*" en cliquant sur la roue crantée dans le coin supérieur droit :
+
+- dans l’onglet "*General*" : insérez le titre "Twitter Survey ™" et choisissez le style "*dark*" ou "*light*" selon votre envie
+- dans l’onglet "*Index*" : sélectionnez "none" pour "*Timestamping*" et insérer "mobiles" pour "*Default index*"
+- dans l’onglet "*Controls*" : cochez toutes les cases afin de vous donner le maximum d’options
+- dans l’onglet "*Timepicker*" : remplissez le champ "Time field" avec "created_at". Cette propriété contient la date du tweet. Elle servira de référence temporelle pour les requêtes
+- fermez la boite de dialogue avec le bouton "*Close*"
+
+La barre de recherche utilise le format [Lucene Query](http://lucene.apache.org/core/2_9_4/queryparsersyntax.html) ou une expression régulière [depuis peu](https://twitter.com/rashidkpc/status/389143881444376576/photo/1/large).
+
+En cliquant sur le bouton "+" du champ recherche, créez 4 barres de recherche contenant les requêtes suivantes :
+
+- `*`
+- `iphone -android -blackberry`
+- `android -iphone -blackberry`
+- `blackberry -iphone -android`
+
+![Dashboard Kibana - Alias](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image6.png)
+
+Vous pouvez épingler des recherches et leurs attribuer un alias.
+
+Cliquez sur chaque rond de couleurs et sauvegardez les alias suivants :
+
+- All
+- iPhone
+- Android
+- Blackberry
+
+Vous devez obtenir un dashboard similaire à celui-ci : [Twitter Survey ™ – Step 1](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-1.json)
+
+![Dashboard Kibana - Pinned Alias](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image7.png)
+
+#### Etape 2 – Ligne Hits
+
+Nous allons ajouter une ligne "Hits" contenant des panels affichant le total de nos recherches "All", "iPhone", "Android", et "Blackberry".
+
+Commencez par ajouter une ligne à votre dashboard :
+
+- cliquez sur le bouton "*Add a row*"
+- insérez "Hits" dans le champ titre
+- cliquez sur le bouton "*Create Row*" puis "*Close*"
+
+Ajoutez un premier panel affichant le nombre total de tweets :
+
+- cliquez sur le bouton "*Add panel to empty row*"
+- sélectionnez le type "hits"
+- choisissez la valeur 3 pour la propriété "", qui correspond au nombre de colonne que le panel va prendre sur la ligne (Kibana est basé sur Twitter Bootstrap, qui utilise un layout de 12 colonnes)
+- choisissez le style "Total" et une taille de police de 28 pt.
+- utilisez la recherche "All" en choisissant "selected" dans le champ "queries", puis cliquez sur "All"
+- cliquez sur le bouton "*Add Panel*" puis "*Close*" pour finir
+
+Répétez cette opération afin de créer les 3 autres panels affichant le total de tweets pour les requêtes "iPhone", "Android" et "Blackberry".
+
+Vous devez obtenir une ligne similaire à celle-ci : [Twitter Survey ™ – Step 2](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-2.json)
+
+![Dashboard Kibana - Ligne Hits](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image8.png)
+
+#### Etape 3 – Ligne Trends
+
+Maintenant que nous sommes capable d’avoir un peu de visibilité sur nos données, voyons comment répondre à une question métier de type :
+
+"Quelle est l’évolution durant les 5 dernières minutes par rapport à l’heure précédente ? ".
+
+Pour cela :
+
+- cliquez sur "Add a row" pour ajoutez une ligne "Trends" qui va contenir nos 4 panels de type "*trends*"
+- utilisez "5m" pour le champ "*Time Ago*"
+- choisissez une police de 20pt
+- utilisez les queries "All", "iPhone", "Android", et "Blackberry", une pour chaque panel
+
+Une fois les 4 panneaux créés, ajoutez un filtre de temps "Last 1 hour" (en haut à droite "add time filter"). Vous remarquerez que votre filtre sur la dernière heure est apparu dans l’accordéon "Filtering".
+
+Vous devez obtenir une ligne similaire à celle-ci : [Twitter Survey ™ – Step 3](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-3.json)
+
+![Dashboard Kibana - Ligne Trends](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image9.png)
+
+#### Etape 4 – Ligne Timeline
+
+Ajoutez une ligne "Timeline" contenant un panel de type "*Histogram*" affichant l’évolution des résultats dans le temps.
+
+Utilisez le mode "count" et la valeur "created_at" pour le champ "*Time Field*".
+
+Sélectionnez les queries "iPhone", "Android" et "Blackberry".
+
+Vous devez obtenir une ligne similaire à celle-ci : [Twitter Survey ™ – Step 4](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-4.json)
+
+![Dashboard Kibana - Ligne Timeline](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image10.png)
+
+#### Ligne 5 – Ligne Analytics
+
+Ajoutez une ligne "Analytics".
+
+Nous allons ajouter 3 panels :
+
+- un panel affichant la répartition entre iPhone, Android et Blackberry
+- un panel affichant les hashtags les plus utilisés
+- une carte affichant les utilisateurs par pays.
+
+Pour cela, ajouter les panels suivants :
+
+- un panel de type "*Hits*", style "pie", et cochez la case "donut" et sélectionnez les queries "iPhone", "Android", "Blackberry"
+- un panel de type "*Pie*", mode "terms", et utilisez "hashtag.text" dans le champ "*Field*" et sélectionnez la query "All" vous pouvez exclure une liste de termes, ici on utilisera : "iphone,android,iphonegames,androidgames,gameinsight,rt,retweet"
+- un panel de type "*Map*", et utilisez "place.country_code" dans le champ "*Field*" et sélectionnez la query "All"
+
+Vous devez obtenir une ligne similaire à celle-ci : [Twitter Survey ™ – Step 5](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-5.json)
+
+![Dashboard Kibana - Ligne Analytics](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image11.png)
+
+#### Ligne 6 – Ligne des Tweets
+
+Afin de visualiser les données sélectionnées dans un tableau paginé, nous allons ajouter une ligne "Tweets" contenant un panel de type "*Table*".
+
+Lors de l’ajout du panel table, ajoutez les colonnes "created_at", "text", et "retweet_count" afin de les afficher par défault.
+
+Sélectionnez la query "All" pour finir.
+
+Vous devez obtenir une ligne similaire à celle-ci (et le dashboard final…) : [Twitter Survey ™ – Step 6](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-6.json)
+
+![Dashboard Kibana - Ligne des tweets](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/image12.png)
+
+#### Dashboard Final
+
+Le [dashboard final](post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard-step-6.json) nous permet de savoir :
+
+- 74939 tweets ont été indéxés
+- Il y a 8.22% de tweets en plus contenant "blackberry", depuis les 5 dernières minutes, par rapport à la dernière heure
+- Quelques tweets viennent d’Indonésie
+
+![Dashboard Kibana - Final](~/assets/images/post/logstash-elasticsearch-kibana-s01e01-analyse-de-reputation-sur-twitter/dashboard.png)
+
+### Pour allez plus loin
+
+Kibana est construit autour des frameworks [Twitter Bootstrap](https://github.com/twbs/bootstrap) et [Angular JS](http://angularjs.org/).
+
+Vous pouvez ajouter votre propre type de panel relativement facilement si ces 2 frameworks vous sont familiers.
+
+Le panel "*Hits*" est un exemple simple pour se plonger dans le projet :
+
+[https://github.com/elasticsearch/kibana/tree/master/src/app/panels/hits](https://github.com/elasticsearch/kibana/tree/master/src/app/panels/hits)
+
+#### Sources
+
+- [http://www.elasticsearch.org/guide](http://www.elasticsearch.org/guide/)
+- [http://lucene.apache.org/core/2_9_4/queryparsersyntax.html](http://lucene.apache.org/core/2_9_4/queryparsersyntax.html)
+- [https://github.com/elasticsearch/elasticsearch-river-twitter/blob/master/README.md](https://github.com/elasticsearch/elasticsearch-river-twitter/blob/master/README.md)
+- [https://dev.twitter.com/docs/streaming-apis/streams/public#Using_the_streaming_APIs](https://dev.twitter.com/docs/streaming-apis/streams/public#Using_the_streaming_APIs)
+- [https://github.com/elasticsearch/kibana/tree/master/src/app/panels/hits](https://github.com/elasticsearch/kibana/tree/master/src/app/panels/hits)
+- [http://fr.slideshare.net/roidelapluie/logstash-and-friends](http://fr.slideshare.net/roidelapluie/logstash-and-friends)
+

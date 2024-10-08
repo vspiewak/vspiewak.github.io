@@ -5,6 +5,30 @@ module.exports = {
   content: ['./src/**/*.{astro,html,js,jsx,json,md,mdx,svelte,ts,tsx,vue}'],
   theme: {
     extend: {
+      typography (theme) {
+        return {
+          DEFAULT: {
+            css: {
+              'code::before': {
+                content: 'none', // don’t generate the pseudo-element
+             // content: '""', // this is an alternative: generate pseudo element using an empty string
+              },
+              'code::after': {
+                content: 'none'
+              },
+              code: {
+                color: theme('colors.slate.700'),
+                backgroundColor: theme('colors.stone.100'),
+                borderRadius: theme('borderRadius.DEFAULT'),
+                paddingLeft: theme('spacing[1.5]'),
+                paddingRight: theme('spacing[1.5]'),
+                paddingTop: theme('spacing.1'),
+                paddingBottom: theme('spacing.1'),
+              },
+            }
+          }
+        }
+      },      
       colors: {
         primary: 'var(--aw-color-primary)',
         secondary: 'var(--aw-color-secondary)',
