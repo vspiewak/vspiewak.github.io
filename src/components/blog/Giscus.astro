@@ -1,0 +1,38 @@
+<section class="mx-auto px-6 sm:px-6 max-w-3xl pt-8 md:pt-4 pb-12 md:pb-20">
+  <script
+    is:inline
+    src="https://giscus.app/client.js"
+    data-repo="vspiewak/giscus.vspiewak.github.io"
+    data-repo-id="R_kgDOM-ZqbA"
+    data-category="Announcements"
+    data-category-id="DIC_kwDOM-ZqbM4CjPgP"
+    data-mapping="url"
+    data-strict="0"
+    data-reactions-enabled="1"
+    data-emit-metadata="0"
+    data-input-position="bottom"
+    data-theme="preferred_color_scheme"
+    data-lang="en"
+    data-loading="lazy"
+    crossorigin="anonymous"
+    async
+  ></script>
+</section>
+
+<script is:inline>
+  function updateGiscusTheme() {
+    console.log('in updateGiscusTheme')
+    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    const iframe = document.querySelector('iframe.giscus-frame')
+    if (!iframe) return
+    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, 'https://giscus.app')
+  }
+
+  const observer = new MutationObserver(updateGiscusTheme)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+  window.onload = () => {
+    // let giscus load with timeout...
+    setTimeout(updateGiscusTheme(), 1000)
+  }
+</script>
