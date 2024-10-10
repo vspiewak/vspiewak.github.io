@@ -20,8 +20,8 @@ metadata:
     site_name: Vincent Spiewak
     images:
       - url: '~/assets/images/default.png'
-        width: 1690
-        height: 1690
+        width: 1200
+        height: 627
     type: website
   twitter:
     handle: '@vspiewak'
