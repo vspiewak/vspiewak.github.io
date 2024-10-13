@@ -31,27 +31,29 @@ You can find easily a [coupon code](https://www.google.com/search?q=ckad+coupon+
 ### Courses
 
 Here is the courses I recommend for the exams :
-* CKAD : [Certified Kubernetes Application Developer CKAD](https://www.sandervanvugt.com/course/certified-kubernetes-application-developer-ckad-video-course/) by [Sander van Vugt](https://www.linkedin.com/in/sandervanvugt)
+* CKAD : [Certified Kubernetes Application Developer CKAD](https://www.sandervanvugt.com/course/certified-kubernetes-application-developer-ckad-video-course/) by [Sander van Vugt](https://www.linkedin.com/in/sandervanvugt).    
 Let's be honest here. At first I was wondering who is Sander ? Why he didn't yet introduced ConfigMaps & Secrets ?
 But at the end of his course, you have learned everthing needed for CKAD, without all the unecessary, and with demos showing you all the shortcuts & easy ways to solve questions using `kubectl run, create, edit, scale` etc...
 By the way, Sander started technical trainings before I even graduated high school 🫡
-* CKA : [The Ultimate Kubernetes Administrator Course](https://www.techworld-with-nana.com/kubernetes-administrator-cka) by [Nana Janashia](https://www.linkedin.com/in/nana-janashia)
-Nana made a really pleasant to watch course about CKA, and like Sander, it shows you only the necessary, without any "fat". 
-* CKS : [Kubernetes CKS Full Course Theory + Practice + Browser Scenarios](https://www.youtube.com/watch?v=d9xfB5qaOfg) by [Kim Wüstkamp](https://www.linkedin.com/in/kimwuestkamp) 
-Kim who made [Killer.sh](https://killer.sh), also provide a **free** CKS course on Youtube! I'm not event sure there is an alternative course for CKS 🤔.
+
+* CKA : [The Ultimate Kubernetes Administrator Course](https://www.techworld-with-nana.com/kubernetes-administrator-cka) by [Nana Janashia](https://www.linkedin.com/in/nana-janashia).   
+Nana made a really pleasant to watch course about CKA, and like Sander, it shows you only the necessary, without any "fat".
+
+* CKS : [Kubernetes CKS Full Course Theory + Practice + Browser Scenarios](https://www.youtube.com/watch?v=d9xfB5qaOfg) by [Kim Wüstkamp](https://www.linkedin.com/in/kimwuestkamp).   
+Kim who made [Killer.sh](https://killer.sh), also provide a **free** CKS course on Youtube ! I'm not event sure there is an alternative course for CKS 🤔
 
 ### Killer.sh > 75
 
 You will have 2 free sessions on [killer.sh](https://killer.sh/), which is quite similar to the PSI Secure Browser. 
 Each one available for 36 hours, but both have the same questions.
-If you succeed to a score of 75 or more, you should be fine at the exam.
+If you succeed to obtain a score of 75 or more, you should be fine at the exam.
 
 ![PSI-like exam UI](~/assets/images/post/how-to-pass-the-kubernetes-exams-ckad-cka-cks-in-1-month/psi-like-exam.png)
 
 
 ### Know how to verify
 
-Be able to verify by yourself your answer is a really good exercise during the training phase.
+Be able to verify your answers is a really good exercise during the training phase.
 For instance, if they ask you to deny all traffic from a pod,
 you can check it using :
 ```bash
@@ -78,7 +80,7 @@ kubectl explain pods --recursive | less
 
 ### kubectl run, create, edit, scale, expose
 
-You can solve most of the questions without writing any yaml, if you know the tricks ;)
+You can solve most of the questions without writing any yaml, if you know the tricks 😉
 Worst scenario would be to type a command, dump the yaml into a file, then edit & apply.
 Here is some samples :
 
