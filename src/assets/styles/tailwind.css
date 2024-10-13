@@ -90,3 +90,7 @@
 .dd *:first-child {
   margin-top: 0;
 }
+
+.dark code {
+  background-color: #24292e;
+}
