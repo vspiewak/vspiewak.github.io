@@ -10,14 +10,13 @@ module.exports = {
           DEFAULT: {
             css: {
               'code::before': {
-                content: 'none', // don’t generate the pseudo-element
-             // content: '""', // this is an alternative: generate pseudo element using an empty string
+                content: 'none',
               },
               'code::after': {
                 content: 'none'
               },
               code: {
-                color: theme('colors.slate.700'),
+                color: theme('dark:colors.slate.700'),
                 backgroundColor: theme('colors.stone.100'),
                 borderRadius: theme('borderRadius.DEFAULT'),
                 paddingLeft: theme('spacing[1.5]'),
