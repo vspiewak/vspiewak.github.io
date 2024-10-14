@@ -16,6 +16,7 @@ import astrowind from './vendor/integration';
 import { readingTimeRemarkPlugin, responsiveTablesRehypePlugin, lazyImagesRehypePlugin } from './src/utils/frontmatter';
 
 import astroExpressiveCode from 'astro-expressive-code';
+import { pluginCollapsibleSections } from '@expressive-code/plugin-collapsible-sections'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +31,7 @@ export default defineConfig({
   astroExpressiveCode({
     themes: [ 'github-dark', 'github-light' ],
     themeCssSelector: (theme) => `.${theme.type}`,
+    plugins: [pluginCollapsibleSections()],
   }),
   tailwind({
     applyBaseStyles: false,
