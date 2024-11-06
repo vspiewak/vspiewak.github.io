@@ -1,19 +1,20 @@
 ---
 publishDate: 2024-10-22T00:00:00Z
-title: 'Turn PostgreSQL to an event streams with Kafka Connect & Debezium'
-excerpt: We will leverage CDC pattern to turns your existing databases into an event streams 🌊
-image: '~/assets/images/post/turn-postgresql-to-event-streams-with-kafka-connect-and-debezium/cover.png'
+title: 'Turn PostgreSQL to an event stream with Kafka Connect & Debezium'
+excerpt: We will leverage CDC pattern to turns your existing databases into an event stream 🌊
+image: '~/assets/images/post/turn-postgresql-to-event-stream-with-kafka-connect-and-debezium/cover.png'
 category: Tutorial
 tags:
   - postgresql
   - kafka
   - debezium
-  - streams
+  - stream
+  - cdc
 metadata:
-  canonical: https://vspiewak.com/turn-postgresql-to-event-streams-with-kafka-connect-and-debezium
+  canonical: https://vspiewak.com/turn-postgresql-to-event-stream-with-kafka-connect-and-debezium
 ---
 
-Debezium is a distributed platform that converts information from your existing databases into event streams, enabling applications to detect, and immediately respond to row-level changes in the databases.
+Debezium is a distributed platform that converts information from your existing databases into event stream, enabling applications to detect, and immediately respond to row-level changes in the databases.
 
 In this article, we will use the [Debezium PostgreSQL connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html) to captures row-level changes that insert, update, and delete database content and streams them to Kafka topics.
 
@@ -195,7 +196,7 @@ e1222cadc74c     postgres            0.0.0.0:5432->5432/tcp                     
 
 After some startup time, you can access Control Center at `http://localhost:9021` and see the `PostgresConnector` available in the Connect section :
 
-![Control Center](~/assets/images/post/turn-postgresql-to-event-streams-with-kafka-connect-and-debezium/connect-with-postgresql-source.png)
+![Control Center](~/assets/images/post/turn-postgresql-to-event-stream-with-kafka-connect-and-debezium/connect-with-postgresql-source.png)
 
 ### Configuring PostgreSQL wal_level
 
@@ -296,7 +297,7 @@ Server: Jetty(9.4.54.v20240208)
 
 You should now be able to see the `cdc-connector` running in your Control Center 😎
 
-![Control Center](~/assets/images/post/turn-postgresql-to-event-streams-with-kafka-connect-and-debezium/connect-with-postgresql-connector.png)
+![Control Center](~/assets/images/post/turn-postgresql-to-event-stream-with-kafka-connect-and-debezium/connect-with-postgresql-connector.png)
 
 You can also view the `replication_slot` created by Debezium using SQL :
 
@@ -350,7 +351,7 @@ We just made 4 changes on our database with :
 
 Using AKHQ, you should be able to see 4 events in the topic `cdc.public.users` !
 
-![AKHQ](~/assets/images/post/turn-postgresql-to-event-streams-with-kafka-connect-and-debezium/akhq-with-cdc-topic.png)
+![AKHQ](~/assets/images/post/turn-postgresql-to-event-stream-with-kafka-connect-and-debezium/akhq-with-cdc-topic.png)
 
 First mesage on `INSERT` :
 ```json collapse={1-163}
