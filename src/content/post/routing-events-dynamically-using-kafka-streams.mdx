@@ -383,7 +383,7 @@ return builder.build();
 
 ### Running the application
 
-After starting docker services using `docker compose up -d` and launching the SpringBoot application using `./mvnw clean spring-boot:run`, you can see that messages from `input-events` topic have been routed to the different country topics based on their field value.
+After starting docker services using `docker compose up -d` and launching the SpringBoot application using `./mvnw clean spring-boot:run`, you can see that messages from the `input-events` topic have been routed to the other topics based on their `country` field value.
 
 ![AKHQ](~/assets/images/post/routing-events-dynamically-using-kafka-streams/kstream-events-router-akhq.png)
 
