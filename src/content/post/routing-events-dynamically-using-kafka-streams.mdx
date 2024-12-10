@@ -18,7 +18,7 @@ In a [previous blog post](https://vspiewak.com/turn-postgresql-to-event-stream-w
 
 Today we will see how to route events from one Kafka topic to multiple topics using Kafka Streams and Spring Boot.
 
-This [Event Router pattern](https://developer.confluent.io/patterns/event-processing/event-router) is particularly useful when an external system publish into a single Kafka topic.
+This [Event Router pattern](https://developer.confluent.io/patterns/event-processing/event-router) might be particularly useful when an external system publish into a single Kafka topic.
 
 ### Step 1 : Docker services
 
@@ -306,28 +306,19 @@ public class OnStartup {
             new String[]{
                     "event-id-1",
                     """
-                    {
-                        "country": "france",
-                        "message": "Bonjour ! 🇫🇷"
-                    }
+                    { "country": "france", "message": "Bonjour ! 🇫🇷" }
                     """
             },
             new String[]{
                     "event-id-2",
                     """
-                    {
-                        "country": "spain",
-                        "message": "¡Buen día! 🇪🇸"
-                    }
+                    { "country": "spain", "message": "¡Buen día! 🇪🇸" }
                     """
             },
             new String[]{
                     "event-id-3",
                     """
-                    {
-                        "country": "japan",
-                        "message": "こんにちは 🇯🇵"
-                    }
+                    { "country": "japan", "message": "こんにちは 🇯🇵" }
                     """
             }
     );
@@ -389,7 +380,7 @@ AKHQ will be available at `http://localhost:8080`.
 
 ![AKHQ](~/assets/images/post/routing-events-dynamically-using-kafka-streams/kstream-events-router-akhq.png)
 
-You can see that messages from the `input-events` topic have been routed to the others based on their `country` field value 🎉
+Messages from the `input-events` topic have been routed to the others based on their `country` field value 🎉
 
 ### Source Code
 
