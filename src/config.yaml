@@ -4,7 +4,6 @@ site:
   base: '/'
   trailingSlash: false
 
-  # FIXME
   googleSiteVerificationId: qk-AffI6VQ7yD4Vu_5ADhm5OhsNMEI6ci4qnShQvoSY
 
 # Default SEO metadata
@@ -59,7 +58,7 @@ apps:
       isEnabled: true
       pathname: 'tag' # Tag main path /tag/some-tag, you can change this to "topics" (/topics/some-category)
       robots:
-        index: false
+        index: true
 
     isRelatedPostsEnabled: true
     relatedPostsCount: 4
