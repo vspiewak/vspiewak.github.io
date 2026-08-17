@@ -1,0 +1,194 @@
+---
+publishDate: 2026-08-17T00:00:00Z
+draft: false
+title: 'gh-auto-updater : opening 27,000+ pull requests across a repo fleet'
+excerpt: How a bash launcher, a GitHub Actions workflow and a directory convention became a fleet-wide update machine — 27,653 PRs, 83% merged, humans always in the loop 🤖
+image: '~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/cover.png'
+category: DevOps
+tags:
+  - github
+  - github-actions
+  - bash
+  - platform-engineering
+metadata:
+  canonical: https://vspiewak.com/gh-auto-updater-mass-pull-requests-across-a-repo-fleet
+---
+
+In [the previous post](https://vspiewak.com/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour), I migrated 1,273 repositories to GitHub in under an hour and ended on a promise : once your fleet lives on one platform, named consistently and tagged with topics, *you can program it*.
+
+Here is what programming it looks like.
+
+Because a migrated fleet has a second law of thermodynamics : it **drifts**. A CI template gets a fix — 2,700 repos still run the old one. A Dockerfile base image needs a bump — in 400 places. Multiply any one-line change by the fleet, and "quick fix" becomes a quarter.
+
+So I built an **auto-updater** : one command that opens the same pull request across hundreds of repositories. In ~10 months it has opened **27,653 PRs** — **83% merged**, every single one reviewed by a human — and **23 engineers** now trigger it without me.
+
+I also published a minimal, runnable version on my GitHub : [**gh-auto-updater**](https://github.com/vspiewak/gh-auto-updater) (with a [sample target repo](https://github.com/vspiewak/gh-auto-updater-sample-repo)). Everything below links to real code you can fork today 🚀
+
+### The idea : updates as code
+
+An *update* is a directory. That's the whole contract :
+
+```text
+auto-updater/
+├── run.sh                  # the launcher (framework, written once)
+├── add-todo-md/            # an updater
+│   ├── run.sh              # the change itself
+│   └── PR.md               # the pitch to humans
+└── add-fortune-md/         # another updater
+    ├── init.sh             # optional : install dependencies
+    ├── run.sh
+    └── PR.md
+```
+
+An updater's `run.sh` runs *inside a fresh clone* of each target repo and just... changes files. The smallest real one, [`add-todo-md`](https://github.com/vspiewak/gh-auto-updater/blob/main/auto-updater/add-todo-md/run.sh), is eight meaningful lines :
+
+```bash
+readonly file='TODO.md'
+
+if [[ ! -f "$file" ]]; then
+  echo '# TODO' > "$file"
+  echo "✅ '$file' created"
+else
+  echo "❎ '$file' already exist"
+fi
+```
+
+Everything else — cloning, branching, committing, pushing, labeling, opening the PR — is the framework's job. And one principle rules the whole design :
+
+> **The bot proposes. Humans decide.**
+
+The auto-updater never pushes to `main`. It opens **pull requests**, with a human-readable `PR.md` as the body, and branch protection stays exactly as strict as before. Mass automation *and* mass review are not opposites — the PR is precisely the interface that reconciles them.
+
+### The launcher : one loop, every guarantee
+
+The [launcher](https://github.com/vspiewak/gh-auto-updater/blob/main/auto-updater/run.sh) is plain bash — strict mode, a temp dir with an `EXIT` trap, and one loop. Condensed :
+
+```bash
+for repo in "${repos[@]}"; do
+
+  # fail-fast if repository not found
+  gh repo view "$GITHUB_ORG/$repo" > /dev/null 2>&1 || continue
+
+  # delete stale branch (auto-closes the old PR) → last run wins, no zombie PRs
+  branch="feature/auto-updater-$update_name"
+  if gh api "repos/$GITHUB_ORG/$repo/branches/$branch" > /dev/null 2>&1; then
+    gh api -X DELETE "repos/$GITHUB_ORG/$repo/git/refs/heads/$branch"
+  fi
+
+  gh repo clone "$GITHUB_ORG/$repo" -- --depth=1
+  cd "$repo"
+
+  # run the updater
+  "$script_dir/$update_name/run.sh" "$repo"
+
+  # no changes ? no PR.
+  if [[ -z "$(git status --porcelain)" ]]; then
+    echo "❎ Nothing changed, skipping..."
+    continue
+  fi
+
+  git checkout -b "$branch"
+  git add -A
+  git commit -m "✨ Feature : $update_name"
+  git push -u origin "$branch"
+
+  gh label create '🤖 auto-updater' -c '#fef2c0' -f
+  gh pr create --label '🤖 auto-updater' \
+    --title "✨ Feature : $update_name" \
+    --body-file "$script_dir/$update_name/PR.md"
+
+done
+```
+
+A [GitHub Actions workflow](https://github.com/vspiewak/gh-auto-updater/blob/main/.github/workflows/auto-updater.yml) wraps it in a `workflow_dispatch` : pick an updater from a dropdown, type the target repos, press the green button. That button *is* the product — no laptop setup, no credentials handling, a run log for every launch.
+
+Three small decisions in that loop carry most of the value :
+
+* **No-op detection.** `git status --porcelain` empty → no branch, no PR, no noise. Which forces updaters to be **idempotent** — and idempotent updaters can be re-launched against the *entire fleet* whenever you want : already-compliant repos are skipped for free. Sound familiar ? Same property that powered the migration engine 😉
+* **Stale-branch delete.** Re-running an updater deletes its previous branch (closing the old PR) before opening a fresh one. Last run wins ; nobody reviews outdated proposals.
+* **The label.** Every PR carries `🤖 auto-updater`. That's an audit trail *and* a free metrics system : one search query — `org:acme is:pr label:"🤖 auto-updater"` — returns everything the machine ever proposed, merged or not.
+
+And yes, the demo includes an updater that installs `fortune` and PRs a fortune cookie into your repos 🥠 — see [the result](https://github.com/vspiewak/gh-auto-updater-sample-repo/blob/main/FORTUNE.md) in the sample repo. If your update machine can't do something silly, it can't do anything serious either.
+
+### Scaling it to 2,700 repositories
+
+The public repo is the pattern. At work, the same design runs against a fleet of 2,700+ repos — and scale changed four things :
+
+**1. Targeting by topics.** Remember the migration post's "topics as an addressing system" ? This is the payoff. The production workflow takes `topics` *or* an explicit repo list — `topics: service` targets every Spring Boot service, `topics: dataform` every transformation pipeline. The fleet self-describes ; the updater just asks GitHub. And the whole launcher UI is GitHub's own **Run workflow** dialog — topics or repos, pick an updater, press the green button :
+
+![The production launcher : GitHub's Run workflow dialog with topics, repositories and the updater dropdown](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/run-workflow-ui.png)
+
+**2. Fan-out topology.** One runner looping over 2,700 repos would take all night and die at the first hiccup. Instead : the parent workflow **chunks the target list (100 repos per chunk)** and fans out each chunk to a child workflow via a matrix (`fail-fast: false`) ; each child runs its repos as another matrix with `max-parallel: 5`. Hundreds of repos in flight, one job log per repo, one repo's failure hurting nobody else. **800+ repositories from a single launch**.
+
+Here is what one manual trigger looks like — a fleet-wide `update-dataform-versions` run : chunked, fanned out, **818 jobs completed in under 17 minutes** ✅
+
+![One auto-updater run : chunk-repos, then a matrix fan-out — 818 jobs completed in 16m59s](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/run-818-jobs.png)
+
+**3. A GitHub App instead of a PAT.** At this volume, a personal token is both a security smell and a rate-limit bottleneck. The production version mints a short-lived **GitHub App installation token** (credentials in a cloud secret manager, fetched over OIDC — nothing stored in the repo). Bonus : PRs and commits are authored by a proper bot identity, so the automation's output is cleanly separated from human work in every stat.
+
+**4. Respecting the rate limiter.** The real boss fight at scale is GitHub's **secondary rate limits** — the abuse-detection kind that a polite `sleep 5` does not appease. The demo's retry loop (10 attempts, 5s) grew into production's : *detect* rate-limit errors specifically, retry up to 50 times with **exponential backoff + jitter**, capped at 5 minutes :
+
+```bash
+jitter=$(( RANDOM % (delay / 2 + 1) ))
+sleep "$(( delay + jitter ))"
+delay=$(( delay * 2 ))
+(( delay > max_delay )) && delay=$max_delay
+```
+
+That little block is the difference between "opened 400 PRs overnight" and "banned by abuse detection at PR #37" 😅
+
+There's a merge side too : once a wave is reviewed, a companion script walks every open auto-updater PR awaiting your review — approve, squash-merge, delete branch — via a `gh search prs` loop. Mass proposal, mass review, mass merge : each step separate, each step logged.
+
+### From patches to desired state
+
+The first generation of updaters were *patches* : `fix-chmod-files`, `add-missing-schema`, one-shot fixes launched fleet-wide, then retired. Twenty-eight of them shipped in the first months.
+
+Then a better shape emerged : today the production updaters are **per-topic template renderers** — one updater per repo type (`service`, `dataform`, `raw`, ...), each carrying a full CI/CD `template/` directory and a `render.sh`. Run it against a repo and the repo **converges to the template** : managed files are re-rendered, repo-owned files are respected. Run it again next month — only the drift becomes a PR.
+
+If that sounds like configuration management — Ansible for repositories, desired state instead of patches — that's exactly what it became. And the template directories themselves ? Direct descendants of the migration's per-pattern templates. Every tool in this series feeds the next one.
+
+### The numbers
+
+Everything below is one GitHub search away — that label again :
+
+![GitHub PR search on the auto-updater label : 27,653 results, bot-opened, human-approved](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/label-search.png)
+
+And the counter moves daily — it will be stale by the time you read this 😄 As of ~10.6 months after the first PR :
+
+* **27,653 pull requests** created — sustained **~600 PRs/week**
+* **22,993 merged (83%)** — every one human-reviewed
+* **4,632 closed unmerged** — and that's *data, not failure* : superseded waves, per-repo opt-outs, kept as an audit trail instead of being swallowed
+* **≥ 1,442 unique repositories** touched
+* **800+ repositories** processed in a single launch — the 818-job run above
+* **23 engineers** have triggered it (all-time, exhaustive) — and **11 have written updater code themselves** ; my own share of launches fell from ~85% to ~68% and keeps falling
+
+That last number is the one I care about. Output proves the machine works. **Adoption proves the design works** : the contribution bar is "a directory with two files", and most of the updater content is now written by teammates, not by me.
+
+### Lessons learned
+
+* **Be a proposal machine, not a push machine.** PRs keep humans in charge, keep branch protection honest, and turn automation into something teams *accept* instead of endure.
+* **Idempotency is the fleet-scale superpower.** Same lesson as the migration, one level up : no-op detection makes "re-run everything" a safe default instead of a risk.
+* **Label everything.** One label turned 27,652 PRs into a queryable dataset — metrics, audit trail and adoption tracking for free.
+* **Plan for the rate limiter.** At fleet scale, backoff + jitter is not an optimization, it's the load-bearing wall.
+* **Lower the contribution bar until the team takes over.** `run.sh` + `PR.md`. That's it. That's why 23 people use it.
+
+### Try it yourself 🚀
+
+Everything in this post exists as a **simpler, self-contained version on my GitHub** — no fleet required, no enterprise setup, just the pattern distilled to its essence :
+
+* [**vspiewak/gh-auto-updater**](https://github.com/vspiewak/gh-auto-updater) — the framework : the launcher, the workflow, and two example updaters
+* [**vspiewak/gh-auto-updater-sample-repo**](https://github.com/vspiewak/gh-auto-updater-sample-repo) — a target repo showing the merged results (yes, including the fortune cookie 🥠)
+
+Your first bot PR is about ten minutes away :
+
+1. **Fork** [`gh-auto-updater`](https://github.com/vspiewak/gh-auto-updater)
+2. Set `GITHUB_ORG` in [`auto-updater/run.sh`](https://github.com/vspiewak/gh-auto-updater/blob/main/auto-updater/run.sh) to your username or org
+3. Create a PAT with `repo` scope and add it as the `GH_AUTO_UPDATER_SECRET` Actions secret
+4. Go to **Actions → ✨ Auto Updater → Run workflow**, target one of your repos, pick `add-todo-md`
+5. Watch a labeled, reviewable PR appear on the target repo 🤖
+
+Writing your own updater is a `mkdir` : a directory with a `run.sh` (make it idempotent !) and a `PR.md`. That's the whole contribution bar — the same one that got 23 engineers onboard at work.
+
+### The series so far
+
+Post one : move 1,273 repos onto one platform and make them consistent. This post : keep them consistent, at ~600 PRs a week, with humans reviewing every change. The fleet is programmable now — and the next thing we're running on these rails is much more ambitious than CI files : a fleet-wide **Java 21 / Spring Boot 3 migration**, tests first. That story is still being written — in every sense 😉
