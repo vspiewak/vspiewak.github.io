@@ -161,6 +161,8 @@ A ❌ meant : re-run that repo's migration (idempotent, remember ?), re-run the 
 
 And one twist for the purists : the harness *can* drive the whole thing — a top-level Temporal workflow chains clean-up → migration (the bash driver, wrapped as an activity) → verification → report. The engine stayed bash ; the harness knew how to drive it end-to-end.
 
+Want to try the pattern ? I published a **minimal, runnable version** of this harness : [**temporal-bash-workflow**](https://github.com/vspiewak/temporal-bash-workflow) — it runs the same per-repository child-workflow fan-out and markdown report against *your own* GitHub account 🚀
+
 ### D-day
 
 In the freeze window :
