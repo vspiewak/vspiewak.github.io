@@ -132,7 +132,20 @@ Here is what one manual trigger looks like — a fleet-wide `update-dataform-ver
 
 **3. A GitHub App instead of a PAT.** At this volume, a personal token is both a security smell and a rate-limit bottleneck. The production version mints a short-lived **GitHub App installation token** (credentials in a cloud secret manager, fetched over OIDC — nothing stored in the repo). Bonus : PRs and commits are authored by a proper bot identity, so the automation's output is cleanly separated from human work in every stat.
 
-**4. Respecting the rate limiter.** The real boss fight at scale is GitHub's **secondary rate limits** — the abuse-detection kind that a polite `sleep 5` does not appease. The demo's retry loop (10 attempts, 5s) grew into production's : *detect* rate-limit errors specifically, retry up to 50 times with **exponential backoff + jitter**, capped at 5 minutes :
+**4. Respecting the *invisible* rate limiter.** GitHub has two kinds of rate limits, and only one of them is honest with you :
+
+* **Primary limits** are queryable : `gh api rate_limit` tells you exactly how much REST, GraphQL or search quota remains and when it resets. Those you can *plan* around.
+* **Secondary limits** are not. Creating a PR falls under GitHub's [content-creation limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#about-secondary-rate-limits) — roughly **80 content-generating requests per minute, 500 per hour** — and none of it appears in the rate-limit API :
+
+```bash
+$ gh api rate_limit --jq '.resources | keys'
+["code_search","core","graphql","search", ...]
+# nothing about creating PRs, issues or comments 🤷
+```
+
+The first you hear of a secondary limit is a `403` mid-run : *"You have exceeded a secondary rate limit."* You cannot schedule around a budget you cannot see — you can only **probe, detect and back off**. That's why the production launcher greps the error text itself (`rate limit`, `secondary limit`, `abuse detection`, `too many requests`) : the error message *is* the API.
+
+And that's exactly why the backoff has **jitter**. Dozens of matrix jobs create PRs in parallel ; when the hidden limit trips, they all receive the `403` *at the same moment*. With a fixed backoff they would all retry at the same moment too — a thundering herd slamming into the same wall, forever. Randomized jitter desynchronizes the herd :
 
 ```bash
 jitter=$(( RANDOM % (delay / 2 + 1) ))
@@ -141,7 +154,7 @@ delay=$(( delay * 2 ))
 (( delay > max_delay )) && delay=$max_delay
 ```
 
-That little block is the difference between "opened 400 PRs overnight" and "banned by abuse detection at PR #37" 😅
+The demo's polite retry loop (10 attempts, 5s) grew into production's **50 attempts, exponential backoff + jitter, capped at 5 minutes**. That little block is the difference between "opened 800 PRs before lunch" and "banned by abuse detection at PR #37" 😅
 
 There's a merge side too : once a wave is reviewed, a companion script walks every open auto-updater PR awaiting your review — approve, squash-merge, delete branch — via a `gh search prs` loop. Mass proposal, mass review, mass merge : each step separate, each step logged.
 
