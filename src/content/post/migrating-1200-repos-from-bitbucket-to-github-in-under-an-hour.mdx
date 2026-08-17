@@ -1,0 +1,198 @@
+---
+publishDate: 2025-12-20T00:00:00Z
+draft: false
+title: 'Migrating 1,273 repositories from Bitbucket to GitHub in under an hour'
+excerpt: How I moved an entire data platform — full git history, CI/CD included — from Bitbucket & Cloud Build to GitHub & GitHub Actions, with a bash engine wrapped in a Temporal harness 🚀
+image: '~/assets/images/post/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour/cover.png'
+category: DevOps
+tags:
+  - github
+  - github-actions
+  - migration
+  - bash
+  - temporal
+  - platform-engineering
+metadata:
+  canonical: https://vspiewak.com/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour
+---
+
+This summer, my freelance mission started with a one-line brief :
+
+> You have to migrate everything to GitHub before Christmas. You'll have a buddy.
+
+*Everything* being the data platform I had just landed on : **1,273 repositories** — Spring Boot microservices, data pipelines, BigQuery executors, Dataflow jobs — living on Bitbucket, with all the CI/CD running on GCP Cloud Build.
+
+The decision itself was already made : the group the company belongs to standardized on **GitHub + GitHub Actions**, so the platform had to follow. Which is actually the healthiest way to start a migration — nobody wastes six months debating tools. The deadline was set, the buddy was real, and the only interesting question left was *execution* :
+
+Full git history preserved. CI/CD working on day one. A freeze window as short as possible, because a hundred developers were waiting to get back to work.
+
+Total migration runtime : **under one hour** ⏱️
+
+Here is how.
+
+### Silver linings first
+
+Even a mandated migration comes with upsides, and for a *fleet* of repos they are massive :
+
+* **Topics as an addressing system.** Every repo self-describes (`service`, `raw`, `batch`, ...). Any tool can later target "all services" with one API call.
+* **Reusable workflows.** One central repository defines the pipelines ; 1,273 repos call them. Fix once, fixed everywhere.
+* **A first-class API and CLI.** `gh` + the REST/GraphQL APIs turn the fleet into something you can *program*.
+
+Keep that word — *fleet* — in mind. It's the theme of this whole story, and of the next one.
+
+### The constraints
+
+A migration like this has a few non-negotiables :
+
+1. **Full history.** Branches, tags, every commit. `git log` must look identical on the other side. Nobody trusts a platform that ate their history.
+2. **CI/CD parity on day one.** A repo without a working pipeline is a repo you cannot ship from.
+3. **A clean cutover.** The old repos must become **read-only** at migration time — a fleet with two writable sources of truth is a disaster generator.
+4. **Proof.** With 1,273 repos, "it looked fine" doesn't scale. Every single repo needed a verifiable check : branches, tags, CI/CD, all accounted for.
+5. **Speed.** The longer the freeze, the more expensive the migration.
+
+### The naive loop is *almost* the answer
+
+My first instinct — probably yours too — was a bash loop :
+
+```bash
+for repo in $(cat repos.txt); do
+  git clone --mirror "git@bitbucket.org:acme/${repo}.git"
+  cd "${repo}.git"
+  git push --mirror "git@github.com:acme/${repo}.git"
+  cd ..
+done
+```
+
+And honestly ? This is 80% of a git migration. `git clone --mirror` + `git push --mirror` moves branches, tags and full history — git does the heavy lifting for free.
+
+But at 1,273 repos, the remaining 20% is where you die 💀 : pushes rejected because someone committed a `target/` directory (or two 100 MB+ XML test fixtures) years ago, `master` vs `main`, repos that no longer exist, API rate limits, network resets mid-push. And one failure at repo #847 raises the real questions : which ones succeeded ? Can I re-run safely ? *How do I prove the 846 others are complete ?*
+
+The answer wasn't to throw bash away. It was to split the problem in two :
+
+* an **engine** : idempotent bash primitives, massively parallelized — the thing that *moves* repos,
+* a **harness** : a durable workflow — the thing that *proves* the move worked, for every single repo.
+
+### The engine : bash + GNU Parallel
+
+**Discovery & classification.** A script fetches every repo slug from the Bitbucket API (OAuth2, credentials pulled from Secret Manager — nothing on disk). The legacy naming convention becomes the classifier : each prefix maps to a repo *pattern* — `da_cd_svc_*` → `service`, `da_cd_raw_*` → `raw`, `da_cd_propagation_*` → `propagation`, and so on. One legacy prefix was shared by two different workload types, so a hand-curated text file disambiguates them. Glamorous ? No. Effective ? Completely.
+
+**Renaming in flight.** Cryptic legacy slugs like `da_cd_svc_loyaltyservices` land as `acme-service-loyaltyservices` : a brand-new, consistent naming convention — `<platform>-<pattern>-<name>` — born *during* the migration, plus topics assigned per pattern. A migration is the cheapest moment you will ever get to remove entropy. Take it.
+
+**Mirroring.** The core of `mirror-repo.sh`, condensed :
+
+```bash
+git clone -q --mirror "git@bitbucket.org:acme/${source_repo}.git"
+cd "${source_repo}.git"
+
+# the target org standardizes on 'main'
+if ! git show-ref --verify --quiet refs/heads/main; then
+  git branch -m master main
+fi
+
+git remote set-url origin "git@github.com:acme/${destination_repo}.git"
+
+if ! git push -q --mirror; then
+  # push rejected → oversized files in history, strip and retry
+  git-filter-repo --path target/ --invert-paths
+  git push --mirror "git@github.com:acme/${destination_repo}.git"
+fi
+```
+
+The `master` → `main` rename happens *inside* the move — free entropy removal again. The fallback handles the archaeological finds : build directories and giant test fixtures committed to history long ago, stripped with `git-filter-repo` and re-pushed.
+
+**CI/CD : generate, don't translate.** Translating 1,273 Cloud Build configs one by one would be a death march — and would faithfully preserve years of per-repo drift 🙃. Instead, each *pattern* has a **template directory** : GitHub Actions workflows calling the central reusable ones, a `Dockerfile`, CI scripts. The generator copies the template, extracts the artifact name from the `pom.xml`, resolves a per-repo workflow config, converts the legacy properties into per-environment release files (six environments, from `dev` to `prd`), deletes the legacy config... and commits the result as a single `Add Github CI/CD files` commit. As a finishing touch, the latest Bitbucket tag becomes a proper GitHub release, changelog generated from the git log 🏷️
+
+Day-one CI/CD parity, by construction — and the fleet comes out *more* consistent than it went in.
+
+**Composition.** The engine is not one big script — it's small scripts with one job each, composed like Unix commands :
+
+```text
+migrate-all.sh           # discovery, classification, fan-out
+└─ migrate-one.sh        # per-repo guards : repo exists ? already migrated ? → skip
+   └─ migrate.sh         # the per-repo pipeline
+      ├─ mirror-repo.sh        # clone --mirror → master→main → push --mirror
+      ├─ generate-cicd.sh      # pattern template → workflows + release files
+      ├─ push-changes.sh       # the single "Add Github CI/CD files" commit
+      └─ gh release create     # latest Bitbucket tag → GitHub release
+```
+
+And every level is **idempotent** : existence checks and skip-if-done guards mean any script can be re-run at any level — one repo, one pattern, or the whole fleet — and it only does the missing work. Idempotent + composable is what makes a migration *debuggable* : when repo #847 fails, you fix it and re-run *its* pipeline, not the world.
+
+**Fan-out.** Idempotent scripts have another superpower : they parallelize for free. GNU Parallel provides the throughput :
+
+```bash
+parallel -P 50 "./migrate-one.sh {} >> /tmp/{}.log 2>&1" ::: "${repos[@]}"
+```
+
+Fifty repos in flight at once, one log file per repo. Real numbers : run sequentially, a single pattern took **1 hour, 2 hours — up to 4 hours** for the worst one. With `-P 50`, the ~90 `service` repos migrated in **about 4 minutes** with Maven build validation included — **2 min 16 s** without — and the full 1,273-repo fleet fit **under one hour**. The engine stays *boring on purpose* — every hard guarantee lives in git itself ; `parallel` just multiplies it.
+
+### The harness : Temporal
+
+Now the part that kept me sleeping at night 😴
+
+Moving the repos is one thing. **Proving** that 1,273 repos each arrived complete is another — that's thousands of network probes against two git providers, and network probes flake. This is exactly the job for a durable workflow engine, so I built the verification layer with [Temporal](https://temporal.io) (Java SDK, JGit under the hood) :
+
+```java
+// one child workflow per repository, all in parallel
+List<Promise<CheckRepositoryResult>> promises = new ArrayList<>();
+
+slugs.forEach(slug -> {
+  CheckRepositoryWorkflow child = Workflow.newChildWorkflowStub(
+      CheckRepositoryWorkflow.class,
+      ChildWorkflowOptions.newBuilder()
+          .setWorkflowId(Workflow.getInfo().getWorkflowId() + "/" + slug)
+          .build());
+
+  promises.add(Async.function(child::run, pattern, slug));
+});
+
+Promise.allOf(promises).get();
+```
+
+Each child workflow runs five checks per repository : the repo exists on both sides, the `pom.xml` is at HEAD, the GitHub Actions files landed, **branch parity** (modulo the `master`/`main` rename) and **tag parity**. Every check is a Temporal activity — a flaky `ls-remote` retries itself with backoff instead of poisoning the result. The Temporal Web UI doubles as a live dashboard : priceless when someone asks "how is it going ?" every five minutes 😅
+
+![One pattern's verification run in the Temporal UI — one child workflow per repository, all completed](~/assets/images/post/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour/temporal-workflows.png)
+
+The output : one markdown report per pattern, one row per repo — the real thing :
+
+![The migration verification report — per-repo parity checks for pom, branches, tags and CI/CD](~/assets/images/post/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour/migration-report.png)
+
+A ❌ meant : re-run that repo's migration (idempotent, remember ?), re-run the report, watch it flip to ✅. You can even spot a branch-count mismatch caught red-handed in the middle of the table 🔍. Boring ? Extremely. Also the single most important artifact for adoption : when a team asked *"is my repo really all there ?"*, the answer was a link, not a promise 📄
+
+And one twist for the purists : the harness *can* drive the whole thing — a top-level Temporal workflow chains clean-up → migration (the bash driver, wrapped as an activity) → verification → report. The engine stayed bash ; the harness knew how to drive it end-to-end.
+
+### D-day
+
+In the freeze window :
+
+* Old Bitbucket repos flipped to **read-only** via the API — no split-brain, ever
+* **1,273 repositories** migrated — branches, tags, full commit history
+* Every repo landing with working, generated GitHub Actions pipelines
+* **Under 1 hour** total runtime, launched from my laptop
+* Verification reports : all green ✅
+
+GitHub's own contribution page for that month tells the story better than I could :
+
+![GitHub contribution activity, October 2025 — Created 12,209 commits in 1,273 repositories, plus the generated CI/CD pull requests](~/assets/images/post/migrating-1200-repos-from-bitbucket-to-github-in-under-an-hour/github-contributions.png)
+
+**12,209 commits created in 1,273 repositories** — as counted by GitHub itself. You can even see the machinery at work below the headline : a generated `add-ci-cd-files` pull request, `+1,730 −0` lines, and the 24 comments of a real human review 👀
+
+The longest part of the project was everything *before* that hour : building the primitives, dry-running patterns, fixing the archaeological repos, generating the CI/CD. The migration itself was pressing enter and watching the reports fill up with ✅
+
+And the "before Christmas" deadline ? Delivered **mid-October** 🎄
+
+### Lessons learned
+
+* **Right tool per phase.** A one-shot data move wants boring, idempotent scripts — git already provides the guarantees. Durable workflows earn their keep where you fan out thousands of flaky checks and need retries, state and a dashboard.
+* **Idempotent + composable beats cleverness.** Small scripts, one job each, every one safe to re-run at any level : failures become boring, re-runs become surgical, and parallelism comes for free.
+* **Generate, don't translate.** Per-pattern templates gave day-one CI/CD parity *and* killed years of config drift in one move.
+* **A migration is the cheapest moment to remove entropy.** Repo renames, a real naming convention, `master` → `main`, topics — all free while everything is in flight anyway.
+* **Verification is a deliverable.** The ✅/❌ report is what turns "trust me" into "see for yourself".
+
+### The real payoff came later
+
+Here is the thing : the migration was worth it, but it was not the end of the story.
+
+Once 1,273 repos sit on one platform, tagged with topics, named consistently, running generated pipelines from a central repository... you have something new : **a fleet you can program**. Those per-pattern template directories from the migration ? They became the direct ancestor of an **auto-updater** — a framework that opens pull requests across hundreds of repositories from a single command. Three months in, it has already shipped **3,000+ PRs**, every one of them human-reviewed.
+
+Moving 1,273 repos in under an hour turned out to be the easy part. Keeping a 1,300-repo fleet consistent afterwards is the real problem — and that is the next post 😉
