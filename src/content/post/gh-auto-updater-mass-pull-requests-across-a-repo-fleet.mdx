@@ -122,6 +122,10 @@ The public repo is the pattern. At work, the same design runs against a fleet of
 
 The workaround : **nest the matrices**. The parent workflow chunks the target list (**100 repos per chunk**, a few lines of `jq`) and fans each chunk out to a *reusable child workflow* through a first matrix (`fail-fast: false`) ; each child then expands its chunk into a second matrix — one job per repo, `max-parallel: 5`. Every individual matrix stays comfortably under the 256 cap, but multiplied together they cover thousands of repositories. Hundreds in flight, one job log per repo, one repo's failure hurting nobody else. **800+ repositories from a single launch** — three times what a single matrix would ever allow.
 
+And a free bonus : because every repository is its own matrix job, GitHub's native **Re-run failed jobs** button becomes fleet-grade tooling. Three repos failed out of 800 ? One click retries exactly those three — not the whole launch. Safe by construction, too : the updaters are idempotent, remember ?
+
+![Re-run all jobs, or only the failed ones — GitHub's native button, fleet-grade thanks to the matrix](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/rerun-failed-jobs.png)
+
 Here is what one manual trigger looks like — a fleet-wide `update-dataform-versions` run : chunked, fanned out, **818 jobs completed in under 17 minutes** ✅ (818 jobs in one run : the matrix-of-matrices at work)
 
 ![One auto-updater run : chunk-repos, then a matrix fan-out — 818 jobs completed in 16m59s](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/run-818-jobs.png)
