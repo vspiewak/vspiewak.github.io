@@ -2,29 +2,40 @@
 import Layout from '~/layouts/PageLayout.astro';
 import Hero from '~/components/widgets/Hero.astro';
 import BlogLatestPosts from '~/components/widgets/BlogLatestPosts.astro';
-import { getBlogPermalink } from '~/utils/permalinks';
+
+import portrait from '~/assets/images/default.png';
 
 const metadata = {
   title: 'Vincent Spiewak | Platform Architect & Tech Lead',
   ignoreTitleTemplate: true,
 };
+
+const tagline = `
+  <img src="${portrait.src}" alt="Vincent Spiewak" loading="eager"
+       class="mx-auto mb-1 h-32 w-32 rounded-full object-cover shadow-lg" />
+`;
 ---
 
 <Layout metadata={metadata}>
   <Hero
-    tagline="Vincent Spiewak · Paris 🇫🇷"
+    tagline={tagline}
     actions={[
-      { variant: 'primary', text: 'Read the blog', href: getBlogPermalink() },
-      { text: 'GitHub', href: 'https://github.com/vspiewak', target: '_blank' },
+      {
+        variant: 'primary',
+        text: 'LinkedIn',
+        href: 'https://www.linkedin.com/in/vspiewak/',
+        target: '_blank',
+        icon: 'tabler:brand-linkedin',
+      },
+      { text: 'GitHub', href: 'https://github.com/vspiewak', target: '_blank', icon: 'tabler:brand-github' },
     ]}
   >
     <Fragment slot="title"> Platform Architect &amp; Tech Lead </Fragment>
     <Fragment slot="subtitle">
       I build platforms — and the teams that run them. <br class="hidden md:inline" />
-      <span class="font-semibold">1,273 repositories</span> migrated in under an hour ·
-      <span class="font-semibold">27,000+ pull requests</span> opened by automation · humans always in the loop.
+      Automation everywhere. Humans always in the loop.
     </Fragment>
   </Hero>
 
-  <BlogLatestPosts title="Latest posts" />
+  <BlogLatestPosts title="Latest posts" classes={{ container: 'pt-0 md:pt-0 lg:pt-0' }} />
 </Layout>
