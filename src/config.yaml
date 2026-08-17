@@ -11,7 +11,7 @@ metadata:
   title:
     default: Vincent Spiewak
     template: '%s | Vincent Spiewak'
-  description: "Personal website"
+  description: "Platform engineering at fleet scale : migrations, mass automation, paved roads. Blog & talks — Vincent Spiewak, Paris."
   robots:
     index: true
     follow: true
