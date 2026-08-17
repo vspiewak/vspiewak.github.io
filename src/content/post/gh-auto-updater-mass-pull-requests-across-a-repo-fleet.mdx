@@ -118,9 +118,11 @@ The public repo is the pattern. At work, the same design runs against a fleet of
 
 ![The production launcher : GitHub's Run workflow dialog with topics, repositories and the updater dropdown](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/run-workflow-ui.png)
 
-**2. Fan-out topology.** One runner looping over 2,700 repos would take all night and die at the first hiccup. Instead : the parent workflow **chunks the target list (100 repos per chunk)** and fans out each chunk to a child workflow via a matrix (`fail-fast: false`) ; each child runs its repos as another matrix with `max-parallel: 5`. Hundreds of repos in flight, one job log per repo, one repo's failure hurting nobody else. **800+ repositories from a single launch**.
+**2. Fan-out topology : a matrix of matrices.** One runner looping over 2,700 repos would take all night and die at the first hiccup. A job matrix is the obvious answer — except GitHub Actions [**caps a matrix at 256 jobs**](https://docs.github.com/en/actions/reference/limits). A fleet-sized target list doesn't fit.
 
-Here is what one manual trigger looks like — a fleet-wide `update-dataform-versions` run : chunked, fanned out, **818 jobs completed in under 17 minutes** ✅
+The workaround : **nest the matrices**. The parent workflow chunks the target list (**100 repos per chunk**, a few lines of `jq`) and fans each chunk out to a *reusable child workflow* through a first matrix (`fail-fast: false`) ; each child then expands its chunk into a second matrix — one job per repo, `max-parallel: 5`. Every individual matrix stays comfortably under the 256 cap, but multiplied together they cover thousands of repositories. Hundreds in flight, one job log per repo, one repo's failure hurting nobody else. **800+ repositories from a single launch** — three times what a single matrix would ever allow.
+
+Here is what one manual trigger looks like — a fleet-wide `update-dataform-versions` run : chunked, fanned out, **818 jobs completed in under 17 minutes** ✅ (818 jobs in one run : the matrix-of-matrices at work)
 
 ![One auto-updater run : chunk-repos, then a matrix fan-out — 818 jobs completed in 16m59s](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/run-818-jobs.png)
 
