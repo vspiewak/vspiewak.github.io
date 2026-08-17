@@ -1,6 +1,8 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import Hero from '~/components/widgets/Hero.astro';
 import BlogLatestPosts from '~/components/widgets/BlogLatestPosts.astro';
+import { getBlogPermalink } from '~/utils/permalinks';
 
 const metadata = {
   title: 'Vincent Spiewak | Platform Architect & Tech Lead',
@@ -9,11 +11,20 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
+  <Hero
+    tagline="Vincent Spiewak · Paris 🇫🇷"
+    actions={[
+      { variant: 'primary', text: 'Read the blog', href: getBlogPermalink() },
+      { text: 'GitHub', href: 'https://github.com/vspiewak', target: '_blank' },
+    ]}
+  >
+    <Fragment slot="title"> Platform Architect &amp; Tech Lead </Fragment>
+    <Fragment slot="subtitle">
+      I build platforms — and the teams that run them. <br class="hidden md:inline" />
+      <span class="font-semibold">1,273 repositories</span> migrated in under an hour ·
+      <span class="font-semibold">27,000+ pull requests</span> opened by automation · humans always in the loop.
+    </Fragment>
+  </Hero>
 
-  <!-- HighlightedPosts Widget ******* -->
-
-  <BlogLatestPosts
-    title="Find out more content"
-  />
-
+  <BlogLatestPosts title="Latest posts" />
 </Layout>
