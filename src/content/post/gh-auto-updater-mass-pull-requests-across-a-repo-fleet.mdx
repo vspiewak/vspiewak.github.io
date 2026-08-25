@@ -49,7 +49,7 @@ if [[ ! -f "$file" ]]; then
   echo '# TODO' > "$file"
   echo "✅ '$file' created"
 else
-  echo "❎ '$file' already exist"
+  echo "❎ '$file' already exists"
 fi
 ```
 
@@ -187,7 +187,7 @@ That last number is the one I care about. Output proves the machine works. **Ado
 
 * **Be a proposal machine, not a push machine.** PRs keep humans in charge, keep branch protection honest, and turn automation into something teams *accept* instead of endure.
 * **Idempotency is the fleet-scale superpower.** Same lesson as the migration, one level up : no-op detection makes "re-run everything" a safe default instead of a risk.
-* **Label everything.** One label turned 27,652 PRs into a queryable dataset — metrics, audit trail and adoption tracking for free.
+* **Label everything.** One label turned 27,653 PRs into a queryable dataset — metrics, audit trail and adoption tracking for free.
 * **Plan for the rate limiter.** At fleet scale, backoff + jitter is not an optimization, it's the load-bearing wall.
 * **Lower the contribution bar until the team takes over.** `run.sh` + `PR.md`. That's it. That's why 23 people use it.
 
