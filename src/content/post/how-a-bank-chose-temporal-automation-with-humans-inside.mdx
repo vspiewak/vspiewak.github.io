@@ -16,7 +16,7 @@ metadata:
   canonical: https://vspiewak.com/how-a-bank-chose-temporal-automation-with-humans-inside
 ---
 
-In 2024, my freelance mission dropped me into the biggest project a bank can run : replacing its **core banking system**. Beside the CBS itself, the inventory listed **more than 80 business processes** to migrate — and some of them were not automated at all : customer support ran them by hand, case by case, folder by folder.
+In 2024, my freelance mission dropped me into the biggest project a bank can run : replacing its **core banking system**. Beside the CBS itself, the inventory listed **more than 80 business processes** to migrate — and some of them were not yet automated : they ran on customer-support expertise.
 
 The CBS world ran on **choreography** : events on Kafka, every service reacting to its neighbors, no central brain. Perfect for service-to-service flows — hopeless when someone asks *"where is this file, and who is it waiting on ?"* three weeks into a process. The long-running processes, the ones with humans inside, needed the opposite model : **orchestration** — one place that owns the state end to end, *outside* the CBS world. A study put [Temporal](https://temporal.io) on the short list, and my job was to prove it on the messiest of the lot. One more constraint came with the territory : the orchestrator had to join those Kafka exchanges without touching the existing services or their message schemas.
 
@@ -37,7 +37,7 @@ Here is how, in a **49-second** demo ⏱️
 
 ### The business : death, in French
 
-The scenario is *succession* — estate settlement, picked straight from the list of 80 : until then it was pure manual work for customer support. A bank learns a customer may have died. It must verify the death against the civil registry, then close every account : block the card, block transfers, close the account, notify. Most steps are API calls. One is not : when the registry cannot confirm the death automatically, **a human has to decide** — and only on official confirmation, a paper letter or an email, which can take days, sometimes **months**. The workflow must hold its place the whole time, then resume exactly where it stopped. That single requirement eliminates half the orchestration market 💀
+The scenario is *succession* — estate settlement, picked straight from the list of 80 : until then it was handled entirely by customer support. A bank learns a customer may have died. It must verify the death against the civil registry, then close every account : block the card, block transfers, close the account, notify. Most steps are API calls. One is not : when the registry cannot confirm the death automatically, **a human has to decide** — and only on official confirmation, a paper letter or an email, which can take days, sometimes **months**. The workflow must hold its place the whole time, then resume exactly where it stopped. That single requirement eliminates half the orchestration market 💀
 
 The prototype is a fictional **BlueBank**, and the code speaks French because the domain does : `ClotureCompte` is an account closure, `VerificationEtatCivil` a civil-registry check. Two JIRA boards — one per workflow — and a small cast of services :
 
