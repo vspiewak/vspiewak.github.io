@@ -20,7 +20,7 @@ Here is what programming it looks like.
 
 Because a migrated fleet has a second law of thermodynamics : it **drifts**. A CI template gets a fix — 2,700 repos still run the old one. A Dockerfile base image needs a bump — in 400 places. Multiply any one-line change by the fleet, and "quick fix" becomes a quarter.
 
-So I built an **auto-updater** : one command that opens the same pull request across hundreds of repositories. In ~10 months it has opened **27,653 PRs** — **83% merged**, every single one reviewed by a human — and **23 engineers** now trigger it without me.
+So I built an **auto-updater** : one command that opens the same pull request across hundreds of repositories. In ~10 months it has opened **27,653 PRs** — **83% merged**, not a single direct push to `main` — and **23 engineers** now trigger it without me.
 
 I also published a minimal, runnable version on my GitHub : [**gh-auto-updater**](https://github.com/vspiewak/gh-auto-updater) (with a [sample target repo](https://github.com/vspiewak/gh-auto-updater-sample-repo)). Everything below links to real code you can fork today 🚀
 
@@ -170,12 +170,12 @@ If that sounds like configuration management — Ansible for repositories, desir
 
 Everything below is one GitHub search away — that label again :
 
-![GitHub PR search on the auto-updater label : 27,653 results, bot-opened, human-approved](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/label-search.png)
+![GitHub PR search on the auto-updater label : 27,653 results, every change the machine ever proposed, merged or not](~/assets/images/post/gh-auto-updater-mass-pull-requests-across-a-repo-fleet/label-search.png)
 
 And the counter moves daily — it will be stale by the time you read this 😄 As of ~10.6 months after the first PR :
 
 * **27,653 pull requests** created — sustained **~600 PRs/week**
-* **22,993 merged (83%)** — every one human-reviewed
+* **22,993 merged (83%)** — through pull requests under branch protection, never a direct push
 * **4,632 closed unmerged** — and that's *data, not failure* : superseded waves, per-repo opt-outs, kept as an audit trail instead of being swallowed
 * **≥ 1,442 unique repositories** touched
 * **800+ repositories** processed in a single launch — the 818-job run above
@@ -210,4 +210,4 @@ Writing your own updater is a `mkdir` : a directory with a `run.sh` (make it ide
 
 ### The series so far
 
-Post one : move 1,273 repos onto one platform and make them consistent. This post : keep them consistent, at ~600 PRs a week, with humans reviewing every change. The fleet is programmable now — and the next thing we're running on these rails is much more ambitious than CI files : a fleet-wide **Java 21 / Spring Boot 3 migration**, tests first. That story is still being written — in every sense 😉
+Post one : move 1,273 repos onto one platform and make them consistent. This post : keep them consistent, at ~600 PRs a week, without a single push to `main`. The fleet is programmable now — and the next thing we're running on these rails is much more ambitious than CI files : a fleet-wide **Java 21 / Spring Boot 3 migration**, tests first. That story is still being written — in every sense 😉
