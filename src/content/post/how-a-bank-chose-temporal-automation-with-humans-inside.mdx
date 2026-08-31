@@ -1,0 +1,208 @@
+---
+publishDate: 2025-08-10T00:00:00Z
+draft: false
+title: 'How a bank chose Temporal : automation with humans inside'
+excerpt: The JIRA board is the workflow UI, a human dragging a card is the signal — the prototype that helped a bank choose Temporal 🤖
+image: '~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/cover.png'
+category: DevOps
+tags:
+  - temporal
+  - jira
+  - golang
+  - kafka
+  - human-in-the-loop
+  - platform-engineering
+metadata:
+  canonical: https://vspiewak.com/how-a-bank-chose-temporal-automation-with-humans-inside
+---
+
+In 2024, my freelance mission dropped me into the biggest project a bank can run : replacing its **core banking system**. Beside the CBS itself, the inventory listed **more than 80 business processes** to migrate — and some of them were not automated at all : customer support ran them by hand, case by case, folder by folder.
+
+The CBS world ran on **choreography** : events on Kafka, every service reacting to its neighbors, no central brain. Perfect for service-to-service flows — hopeless when someone asks *"where is this file, and who is it waiting on ?"* three weeks into a process. The long-running processes, the ones with humans inside, needed the opposite model : **orchestration** — one place that owns the state end to end, *outside* the CBS world. A study put [Temporal](https://temporal.io) on the short list, and my job was to prove it on the messiest of the lot. One more constraint came with the territory : the orchestrator had to join those Kafka exchanges without touching the existing services or their message schemas.
+
+Because that is where every business-workflow project dies. The automation part goes fine — until someone says : *"step 4 needs a human"*. And the classic answer is a brand-new back-office UI : a task list, a detail page, approve / reject buttons, an audit trail, authentication. Months of work nobody budgeted, for screens the operators never asked for 🥲
+
+Customer support did not need new screens. Their daily reality was **email, Excel sheets and JIRA** — that is where the work already lived. So the prototype took the opposite bet : plug the workflow engine into the tools they had already adopted.
+
+**JIRA is the UI.** The workflow engine projects its state onto their board — and reads their decisions back off it.
+
+Here is how, in a **49-second** demo ⏱️
+
+<video controls muted playsinline width="100%" preload="metadata" poster="/post/how-a-bank-chose-temporal-automation-with-humans-inside/poster.png">
+  <source src="/post/how-a-bank-chose-temporal-automation-with-humans-inside/demo.mp4" type="video/mp4" />
+  <a href="/post/how-a-bank-chose-temporal-automation-with-humans-inside/demo.mp4">Download the demo video</a>
+</video>
+
+*The full run : five cards created, the boards animating themselves, one human drag, and the Temporal Web UI behind it all.*
+
+### The business : death, in French
+
+The scenario is *succession* — estate settlement, picked straight from the list of 80 : until then it was pure manual work for customer support. A bank learns a customer may have died. It must verify the death against the civil registry, then close every account : block the card, block transfers, close the account, notify. Most steps are API calls. One is not : when the registry cannot confirm the death automatically, **a human has to decide** — and only on official confirmation, a paper letter or an email, which can take days, sometimes **months**. The workflow must hold its place the whole time, then resume exactly where it stopped. That single requirement eliminates half the orchestration market 💀
+
+The prototype is a fictional **BlueBank**, and the code speaks French because the domain does : `ClotureCompte` is an account closure, `VerificationEtatCivil` a civil-registry check. Two JIRA boards — one per workflow — and a small cast of services :
+
+![Architecture of the prototype — JIRA webhooks reach a Go server that starts and signals Temporal workflows ; Succession spawns one ClotureCompte child per account ; commands go out on Kafka to the card processor, and the response, headers echoed, comes back to Temporal through the signal bridge](~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/architecture.png)
+
+One workflow per JIRA card. One card per workflow. Keep that symmetry in mind — everything below falls out of it.
+
+### The trap : welding the board into the business logic
+
+The obvious wiring is to sprinkle JIRA calls through the workflow : move the card here, add a comment there. It works for a demo and then rots — the business logic and the board choreography are welded together, and every board tweak is a workflow redeploy.
+
+The [worker interceptor](https://docs.temporal.io/develop/go/interceptors) is the way out. It wraps every activity and workflow execution on the worker, so *cross-cutting* code has one home. Mine does exactly one thing : it treats the JIRA board as a **projection** of the execution. Condensed :
+
+```go
+func (a *activityInboundInterceptor) beforeActivity(ctx context.Context, in *interceptor.ExecuteActivityInput) {
+
+	activityName := activity.GetInfo(ctx).ActivityType.Name
+	input := in.Args[0].(ClotureInput)
+
+	switch activityName {
+	case "VerificationCompte":
+		a.updateJiraIssueWithTemporalInfos(ctx, input) // deep link to the Temporal Web UI
+		a.moveJiraIssue(ctx, input, JiraTransitionVerificationCompte)
+	case "BlocageCarte":
+		a.moveJiraIssue(ctx, input, JiraTransitionBlocageCarte)
+	case "BlocageVirement":
+		a.moveJiraIssue(ctx, input, JiraTransitionBlocageVirement)
+	case "FermetureCompte":
+		a.moveJiraIssue(ctx, input, JiraTransitionFermetureCompte)
+	}
+}
+```
+
+The activity name *is* the board column. When the worker starts `BlocageCarte`, the card slides to **Blocage Carte** — the operators watch the workflow execute in real time, in the tool they already live in. And the workflow code never touches the board : no transitions, no comments, no labels. The business sequence reads like the procedure it implements :
+
+```go
+func ClotureCompte(ctx workflow.Context, input ClotureInput) (bool, error) {
+	// retry policy & timeouts elided
+
+	verified, err := verificationCompte(ctx, a, input)
+	// not verified ~> stop here
+
+	err = blocageCarte(ctx, a, input)
+	err = blocageVirement(ctx, a, input)
+	err = fermetureCompte(ctx, a, input)
+
+	if input.Initiative == JiraInitiativeBankWithNotice {
+		err = notificationClient(ctx, a, input)
+		err = workflow.Sleep(ctx, noticePeriod) // the legal notice period, durably
+	}
+
+	return true, nil
+}
+```
+
+> **The workflow engine already knows the state. Project it — don't rebuild it.**
+
+The interceptor also stamps a custom field with a deep link to the workflow's history in the Temporal Web UI. From any card, one click lands an operator — or me, debugging — on the full execution trace 🔍
+
+![A JIRA card with the workflow's custom fields — "Lien du workflow" deep-links straight into the Temporal Web UI execution history](~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/jira-card-workflow-link.png)
+
+### Retries your back-office can see
+
+The same interceptor turns failures into something a non-engineer can reason about. After every failed activity attempt :
+
+```go
+if err != nil {
+	a.commentJiraIssueWithError(ctx, input, err)   // ADF panel : "#3 - Echec de l'activité BlocageCarte, raison: ..."
+	a.moveJiraIssue(ctx, input, JiraTransitionErreurTechnique)
+}
+```
+
+Because it fires *per attempt*, a flaky downstream leaves a visible trail : comment `#1`, comment `#2`, comment `#3`... then either the card moves on, or it parks in **Erreur Technique** with the whole story attached. The retry policy — usually invisible machinery — becomes legible to the people who answer the customer's phone call. That, more than any dashboard, is what made the demo land ✅
+
+The outcomes get a taxonomy too, as labels : `Non_Trouvé` (not a customer), `Non_Confirmé` (very much alive), `Echec` (workflow failed). A back-office lead can filter the board by label and know exactly what needs whom.
+
+### The card carries its own return address
+
+Now the human-in-the-loop part. When `VerificationEtatCivil` cannot confirm the death automatically, the interceptor writes **the workflow's own coordinates** — workflow ID, run ID, and the name of the signal it is about to wait on — into three custom fields on the card, and flags it :
+
+```go
+weId := activity.GetInfo(ctx).WorkflowExecution.ID
+runId := activity.GetInfo(ctx).WorkflowExecution.RunID
+
+a.root.options.JiraService.UpdateJiraIssue(input.IssueKey, fmt.Sprintf(
+	`{ "fields": { "%s":"%s", "%s":"%s", "%s":"%s", "labels": ["Action_Requise"] } }`,
+	JiraIssueCustomFieldWorkflowId, weId,
+	JiraIssueCustomFieldRunId, runId,
+	JiraIssueCustomFieldWorkflowSignalName, SignalNameEtatCivil,
+))
+```
+
+Then the workflow blocks on that signal — for days, sometimes months, durably :
+
+```go
+selector := workflow.NewSelector(ctx)
+signalChan := workflow.GetSignalChannel(ctx, SignalNameEtatCivil)
+selector.AddReceive(signalChan, func(c workflow.ReceiveChannel, more bool) {
+	c.Receive(ctx, &result)
+})
+selector.Select(ctx) // waits for the human
+```
+
+A human reviews the paperwork and drags the card — to **Etat Civil Vérifié**, or to **Rejet Traitement**. JIRA fires its webhook, and the handler simply reads the three fields back off the card and signals, with a payload chosen by the *destination column* :
+
+```go
+case moved && movedToString == "Etat Civil Vérifié":
+	weId := issue(JiraIssueCustomFieldWorkflowId)
+	runId := issue(JiraIssueCustomFieldRunId)
+	signalName := issue(JiraIssueCustomFieldWorkflowSignalName)
+
+	temporalClient.SignalWorkflow(ctx, weId, runId, signalName,
+		&VerificationEtatCivilResult{IsVerified: true, IsDeathDeclared: true})
+```
+
+No correlation table, no lookup service, no polling. The work item *is* the correlation store, and **the drag is the decision**. Different column, different payload, different branch of the business — made by a human, recorded where humans work 🚀
+
+### Orchestration meets choreography
+
+Blocking the card goes through the card processor the way everything talks in the CBS world : a command on a Kafka topic, an event back — pure choreography. Remember the constraint — existing services and message schemas must not change. So : same return-address pattern, different envelope. The activity stamps the workflow's coordinates into the **message headers**, and the payload stays exactly what it always was :
+
+```go
+headers := []kafka.Header{
+	{Key: "TEMPORAL_WORKFLOW_ID",   Value: []byte(activity.GetInfo(ctx).WorkflowExecution.ID)},
+	{Key: "TEMPORAL_RUN_ID",        Value: []byte(activity.GetInfo(ctx).WorkflowExecution.RunID)},
+	{Key: "TEMPORAL_WORKFLOW_TYPE", Value: []byte(activity.GetInfo(ctx).WorkflowType.Name)},
+	{Key: "TEMPORAL_SIGNAL_NAME",   Value: []byte(SignalNameBlockCard)},
+}
+```
+
+The processor does its work and echoes the headers back untouched on the response topic. On the other side, a **generic signal bridge** — four tiny Spring classes, zero domain knowledge — reads the headers, rebuilds an untyped stub, and fires the signal :
+
+```java
+var workflowStub = client.newUntypedWorkflowStub(
+        workflowId,
+        Optional.of(workflowRunId),
+        Optional.of(workflowType));
+
+workflowStub.signal(signalName, input);
+```
+
+No topic changed, no schema changed, and the card processor never heard of Temporal — its only job is what a good Kafka citizen does anyway : echo the headers it received. Orchestration on top, choreography underneath, and nobody had to pick a side. The callback address travels with the message, so the bridge works for *any* workflow and *any* signal, forever. A JIRA column drag and a Kafka response are the same thing to the workflow : a signal that finally arrived 😉
+
+![One account closure in the Temporal Web UI — BlocageCarte stays open until Signal_BlocageCarte comes back through Kafka, then the remaining activities run](~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/temporal-signal-blocage-carte.png)
+
+### 49 seconds, five endings
+
+The demo script creates five cards in a row, one per branch of the taxonomy : a person who is not a customer, one who is very much alive, one whose death the registry confirms automatically, one who needs the human check, and one wired to fail on purpose. Forty-nine seconds later the board tells five different stories — rejected with `Non_Trouvé`, rejected with `Non_Confirmé`, closed straight through, parked on **Action_Requise** waiting for a drag, and parked in **Erreur Technique** with its retry trail in the comments.
+
+![The Succession board mid-run — five cards in five different columns : Recherche Client, Attente Etat Civil with Action_Requise, Clôture Comptes, and two rejections labeled Non_Trouvé and Non_Confirmé](~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/jira-board-five-endings.png)
+
+And the same story from the engine's side — one Succession execution : three activities, two clôture tickets created, two `ClotureCompte` child workflows, **35 seconds** end to end :
+
+![The Succession timeline in the Temporal Web UI — RechercheClient, VerificationEtatCivil, RechercheComptes, then two CreationTicketJiraCloture activities and two ClotureCompte child workflows](~/assets/images/post/how-a-bank-chose-temporal-automation-with-humans-inside/temporal-succession-timeline.png)
+
+We showcased the run inside the bank. The back-office people watched cards move *by themselves*, dragged one, and understood the whole system in under a minute. No slide deck ever did that.
+
+The steering committee validated the approach, and the bank adopted **Temporal as its orchestration solution** for the processes leaving the CBS world. A prototype's adoption metric is binary : this one returned `true` ✅
+
+### Lessons learned
+
+* **The best back-office UI is the one already open.** Operators did not learn a tool ; the tool learned the workflow.
+* **Interceptors are projection layers.** Board choreography is a cross-cutting concern, same as logging or metrics — one interceptor per board, zero JIRA calls in the business logic.
+* **Store the callback address in the work item.** Custom fields or Kafka headers, same pattern : the workflow's coordinates travel with the work, and correlation infrastructure disappears.
+* **Make retries visible to non-engineers.** An error panel per attempt, on the card, builds more trust than any SLO dashboard.
+* **The human is a step, not a fallback.** Some checks cannot be automated — a death the registry cannot confirm, a legal representative only a letter or an email can attest. The workflow's job is to wait well.
+
+Somewhere in that bank, right now, a JIRA card is waiting for a paper letter — and a workflow is waiting with it, patiently, for as long as it takes 😉
