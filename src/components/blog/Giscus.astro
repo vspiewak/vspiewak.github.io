@@ -1,38 +1,53 @@
-<section class="mx-auto px-6 sm:px-6 max-w-3xl mt-8">
-  <script
-    is:inline
-    src="https://giscus.app/client.js"
-    data-repo="vspiewak/vspiewak.github.io"
-    data-repo-id="R_kgDOM9V8Xg"
-    data-category="Announcements"
-    data-category-id="DIC_kwDOM9V8Xs4CkCbT"
-    data-mapping="url"
-    data-strict="0"
-    data-reactions-enabled="1"
-    data-emit-metadata="1"
-    data-input-position="top"
-    data-theme="preferred_color_scheme"
-    data-lang="en"
-    data-loading="lazy"
-    crossorigin="anonymous"
-    async
-  ></script>
-</section>
+<section id="giscus" class="mx-auto px-6 sm:px-6 max-w-3xl mt-8"></section>
 
 <script is:inline>
-  function updateGiscusTheme() {
-    console.log('in updateGiscusTheme')
-    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-    const iframe = document.querySelector('iframe.giscus-frame')
-    if (!iframe) return
-    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, 'https://giscus.app')
-  }
+  (function () {
+    const GISCUS = 'https://giscus.app';
+    const siteTheme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 
-  const observer = new MutationObserver(updateGiscusTheme)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    // Built here rather than written as a tag, so the widget starts in the site's theme
+    // (the toggle or the saved choice), not the OS one.
+    const script = document.createElement('script');
+    script.src = GISCUS + '/client.js';
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    const config = {
+      repo: 'vspiewak/vspiewak.github.io',
+      'repo-id': 'R_kgDOM9V8Xg',
+      category: 'Announcements',
+      'category-id': 'DIC_kwDOM9V8Xs4CkCbT',
+      mapping: 'url',
+      strict: '0',
+      'reactions-enabled': '1',
+      'emit-metadata': '1',
+      'input-position': 'top',
+      theme: siteTheme(),
+      lang: 'en',
+      loading: 'lazy',
+    };
+    for (const [key, value] of Object.entries(config)) script.setAttribute('data-' + key, value);
+    document.getElementById('giscus').appendChild(script);
 
-  window.onload = () => {
-    // let giscus load with timeout...
-    setTimeout(updateGiscusTheme(), 1000)
-  }
+    // Once per document : <html> and window outlive the view-transition swaps.
+    if (window.giscusThemeSync) return;
+    window.giscusThemeSync = true;
+
+    // The iframe loads lazily, so a toggle can come before it listens and the message is
+    // lost. It counts as ready once it has sent its first message ; from then on it
+    // follows every toggle.
+    const syncTheme = () => {
+      const iframe = document.querySelector('iframe.giscus-frame');
+      const theme = siteTheme();
+      if (!iframe || !iframe.dataset.ready || iframe.dataset.syncedTheme === theme) return;
+      iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, GISCUS);
+      iframe.dataset.syncedTheme = theme;
+    };
+    window.addEventListener('message', (event) => {
+      if (event.origin !== GISCUS) return;
+      const iframe = document.querySelector('iframe.giscus-frame');
+      if (iframe) iframe.dataset.ready = '1';
+      syncTheme();
+    });
+    new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  })();
 </script>
