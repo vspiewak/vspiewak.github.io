@@ -1,7 +1,11 @@
 import getReadingTime from 'reading-time';
 import { toString } from 'mdast-util-to-string';
-import { visit } from 'unist-util-visit';
+import { visit, SKIP } from 'unist-util-visit';
 import type { MarkdownAstroData, RehypePlugin, RemarkPlugin } from '@astrojs/markdown-remark';
+
+// French spacing ("Here is how :") : the space before : ; ? ! becomes a no-break space, so
+// the mark never starts a line on its own. Sources keep a plain space.
+export const frenchSpacing = (text: string) => text.replace(/ ([:;?!]+)(?![\p{L}\p{N}])/gu, ' $1');
 
 export const readingTimeRemarkPlugin: RemarkPlugin = () => {
   return function (tree, file) {
@@ -42,6 +46,20 @@ export const lazyImagesRehypePlugin: RehypePlugin = () => {
     visit(tree, 'element', function (node) {
       if (node.tagName === 'img') {
         node.properties.loading = 'lazy';
+      }
+    });
+  };
+};
+
+export const frenchSpacingRehypePlugin: RehypePlugin = () => {
+  return function (tree) {
+    visit(tree, function (node) {
+      // Code keeps its spaces exactly as typed.
+      if (node.type === 'element' && ['pre', 'code', 'kbd', 'samp', 'script', 'style'].includes(node.tagName)) {
+        return SKIP;
+      }
+      if (node.type === 'text') {
+        node.value = frenchSpacing(node.value);
       }
     });
   };
